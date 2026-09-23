@@ -7,8 +7,8 @@ spec_status: frozen
 current_phase:
   id: P001
   name: Repository Foundation + Core Persistent Model
-  status: CLAUDE_REAUDITING
-  audit_round: 1
+  status: CHANGES_REQUESTED
+  audit_round: 2
 
 status_values:
   - PLANNED
@@ -22,6 +22,6 @@ status_values:
   - BLOCKED_BY_SPEC_GAP
 
 last_codex_commit: 67a7489c32f616840bac6f6170d56b90ce2783f2
-last_claude_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R01.md
-open_required_findings: 6
+last_claude_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R02.md
+open_required_findings: 1
 open_spec_gaps: [SG-0001, SG-0002]
