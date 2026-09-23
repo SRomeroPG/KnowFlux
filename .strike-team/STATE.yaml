@@ -21,7 +21,7 @@ status_values:
   - ACCEPTED
   - BLOCKED_BY_SPEC_GAP
 
-last_codex_commit: c738bd6675bb44c80ef890daf28b335718fbe9c5
+last_codex_commit: 0dddf47efccff4a97fc643fbcbfebfb3e4c52f6c
 last_claude_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
 acceptance_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
 open_required_findings: 0

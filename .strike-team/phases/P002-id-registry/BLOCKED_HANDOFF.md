@@ -4,6 +4,8 @@
 
 `BLOCKED_BY_SPEC_GAP`. This is a partial implementation checkpoint, not a `CODEX_HANDOFF.md`, and P002 is not ready for Claude acceptance. No subsequent phase is authorized.
 
+Checkpoint commit: `0dddf47efccff4a97fc643fbcbfebfb3e4c52f6c`. P001's accepted Claude audit remains unchanged.
+
 ## Safe completed subset
 
 - `framework/engine/id-registry.mjs` initializes a fresh project's `.kf/id-registry.yaml` and allocates provisional IDs through an exclusive directory lock and atomic file replacement.
