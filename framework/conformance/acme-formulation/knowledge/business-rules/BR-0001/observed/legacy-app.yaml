@@ -1,0 +1,16 @@
+schema_version: 2.1
+entity: BR-0001
+facet: observed
+target: {repository: legacy-app, environment: production}
+as_of: 2026-11-02
+observed_against: {repository: legacy-app, commit: abc123def}
+logic:
+  kind: decision-table
+  hit_policy: first
+  exhaustive: false
+  inputs: [{ref: DE-0001.concentration, type: quantity, unit: percent_mass}]
+  rules:
+    - id: r1
+      when: {}
+      then: {max_concentration: {value: "4.5", unit: percent_mass}}
+discovery: {method: static-analysis, agent: archaeologist}

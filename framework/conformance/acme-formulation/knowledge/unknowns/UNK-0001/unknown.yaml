@@ -1,0 +1,11 @@
+schema_version: 2.1
+id: UNK-0001
+type: unknown
+question: What does the legacy material flag mean?
+why_it_matters: It may change the concentration branch.
+blocks: [BR-0001#specified, CAP-0001]
+evidence: [EV-0001]
+required_source: {kind: sme, role: formulation-scientist}
+attempts:
+  - {method: code-search, at: 2026-11-03, result: No definition found}
+status: open

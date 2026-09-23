@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/data-entity-observed.schema.json",
+  "type": "object",
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/observedFacetBase" },
+    { "$ref": "common.schema.json#/$defs/facetNames" }
+  ],
+  "properties": {
+    "entity": { "$ref": "common.schema.json#/$defs/deId" },
+    "fields": { "type": "object", "additionalProperties": { "type": "object", "allOf": [ { "$ref": "common.schema.json#/$defs/facetNames" } ], "properties": { "logic": { "$ref": "logic.schema.json" } }, "additionalProperties": true } },
+    "persistence": { "type": "object" }
+  },
+  "required": ["fields", "persistence"],
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,20 @@
+schema_version: 2.1
+id: BR-0002
+type: business-rule
+name: Chemical review
+identity:
+  rule_kind: authorization
+  subject: chemical review
+  determination: whether reviewer approval is required
+  governs: [DE-0001]
+lifecycle: {status: active}
+specified:
+  version: 1
+  scope: {business_unit: [A]}
+  validity: {effective_from: 2027-03-01, effective_until: null}
+  logic:
+    kind: narrative
+    unstructured_reason: Requires professional judgment by a chemical reviewer.
+  verification:
+    mode: attested
+    attested_by: {type: human, role: formulation-scientist, at: 2026-11-02}

@@ -1,0 +1,13 @@
+schema_version: 2.1
+id: DE-0001
+type: data-entity
+name: Formulation
+contains: [DE-0002]
+lifecycle: {status: active}
+specified:
+  version: 1
+  scope: {business_unit: [A]}
+  validity: {effective_from: 2026-10-01, effective_until: null}
+  fields:
+    concentration: {type: quantity, unit: percent_mass}
+  persistence: {kind: relational, table: formulations}

@@ -1,0 +1,21 @@
+{
+  "name": "knowflux-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/check-schemas.mjs",
+    "typecheck": "node scripts/check-schemas.mjs",
+    "lint": "eslint .",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0"
+  }
+}

@@ -1,0 +1,9 @@
+schema_version: 2.1
+entity: BP-0001
+facet: observed
+target: {repository: legacy-app, environment: production}
+as_of: 2026-11-02
+observed_against: {repository: legacy-app, commit: abc123def}
+steps:
+  - {id: s1, name: Validate concentration, executes: [BR-0001], reads: [DE-0001]}
+  - {id: s2, name: Save formulation, writes: [DE-0001]}

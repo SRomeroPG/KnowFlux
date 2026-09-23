@@ -1,0 +1,16 @@
+schema_version: 2.1
+id: CHG-0001
+type: MODIFY
+decided_at: 2026-11-02
+effective_from: 2027-03-01
+impact_classes: [behavioral]
+affects:
+  - {facet: BR-0001#specified@v2, previous_version: 1, new_version: 2}
+reason: Regulatory limit changed for the future specified facet.
+authority: {type: human, role: regulatory-officer, ref: decision-001}
+evidence: [EV-0002]
+changed_fields:
+  - path: logic.rules[r1].when.concentration.lte.value
+    from: "4.2"
+    to: "4.0"
+requires_revalidation: [SC-0001]

@@ -1,0 +1,5 @@
+schema_version: 2.1
+id: CAP-0001
+type: capability
+name: Manage formulations
+lifecycle: {status: active}

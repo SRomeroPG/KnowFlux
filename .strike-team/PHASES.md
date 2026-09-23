@@ -1,9 +1,42 @@
-# Phase Registry
+# KnowFlux roadmap through Milestone 1
 
-No implementation phase has been authorized.
+Core Specification v2.1 §53 fixes the dependency order. Each P phase is independently auditable. Only P001 is authorized. Later boundaries may be refined after an accepted phase, without moving a §53 item ahead of its prerequisites. `Pxxx accepted` means the independent Claude gate has passed.
 
-When the user starts a phase, assign the next `Pxxx` identifier, create `.strike-team/phases/Pxxx-<phase-name>/`, and add a completed `PLAN.md` before implementation begins. The registry should then link the phase plan, traceability matrix, Codex handoffs, remediation records, and Claude audit records.
+| Phase and §53 item | Primary clauses | Dependencies | Deliverable; verification/conformance | Risk; expected Codex specialists | Claude focus; boundary reason |
+|---|---|---|---|---|---|
+| [P001 Repository Foundation + Core Persistent Model](phases/P001-core-persistent-model/PLAN.md); A1 | §§4, 6.1, 7, 9–10, 14–16.3, 18.1–18.2, 20–23, 26, 42.1, 54–55 | Bootstrap | 11 schemas, separate facet classes, partial text fixture, positive/negative schema tests | HIGH; spec analyst, schema engineer, conformance engineer | Persistent shape and ownership; format migration is costly. |
+| P002 ID Registry; A2 | §§8, 10.7 | P001 accepted | Allocation, provisional/permanent states, aliases; branch/collision cases | HIGH; schema engineer, conformance engineer | Immutable permanent IDs; independent of evidence. |
+| P003 Evidence Resolver Contract; A3a | §§3.2, 16.3–16.4 | P002 accepted | Generic interface and fingerprint harness; resolver contract tests | HIGH; core implementer, conformance engineer | Provider neutrality; isolate interface before adapters. |
+| P004 Source Code Resolver; A3b | §§16.3–16.5 | P003 accepted | One language adapter; rename, move, stale/broken fixture | HIGH; core implementer, conformance engineer | Anchor recovery; one adapter is auditable. |
+| P005 Database Schema Resolver; A3c | §§10.5, 16.4–16.5 | P004 accepted | Canonical database fingerprint and observed DE extraction; order/type drift tests | HIGH; schema engineer, conformance engineer | Semantic versus formatting drift; distinct source kind. |
+| P006 Evidence Classes and Confidence; A4 | §§14–17 | P005 accepted | Facet confidence policy and human override contract; class-crossing tests | HIGH; schema engineer, conformance engineer | No observed/specifying cross-promotion; requires resolver states. |
+| P007 Full `kf validate`; A5 | §§6–10, 16, 26, 36, 42 | P006 accepted | Semantic checks, reference integrity, ownership and catalog diagnostics; complete negative suite | CRITICAL; core implementer, schema engineer, conformance engineer | Complete diagnostics and deterministic output; closes format phase. |
+| P008 Modeling Katas; B6 | §§4–5, 7, 10, App. G | P007 accepted | All 18 listed katas in CI; classification fixtures | MEDIUM; conformance engineer, mechanical worker | Modeling edge cases; separate corpus audit. |
+| P009 Normalization and Dedup; B7 | §6.2 | P008 accepted | `kf-normalize-v1` and four command gates; locale/collision tests | HIGH; schema engineer, conformance engineer | Determinism and advisory boundary; separate from validation. |
+| P010 Prose Contract and Lint; B8 | §§13, 42 | P009 accepted | Markdown/YAML lint and generated block checks; prose fixtures | MEDIUM; core implementer, conformance engineer | No duplicate authored truth; closes ontology phase. |
+| P011 Decision Table Logic; C9a | §§11, 12.1 | P010 accepted | Decimal/unit foundation and table evaluator; exhaustiveness cases | HIGH; core implementer, conformance engineer | Exact numeric and predicate semantics; one grammar. |
+| P012 Formula Logic; C9b | §§11, 12.2 | P011 accepted | Expression evaluator and unit algebra; rounding/guard cases | HIGH; core implementer, conformance engineer | No implicit conversion; distinct evaluator. |
+| P013 State Machine and Narrative Logic; C9c | §§12.3–12.4, 26.3 | P012 accepted | Transition checks and narrative verification; negative cases | HIGH; core implementer, conformance engineer | Reachability and honest narrative claims; closes grammars. |
+| P014 Scenario Checking; C10 | §§7.3, 26 | P013 accepted | Facet-aware `kf check-rules`; 24-case fixture progression | HIGH; core implementer, conformance engineer | Correct asserts target; requires evaluators. |
+| P015 Golden Master; C11 | §§16.1, 16.4, 27 | P014 accepted | Recording, comparison and observed-only evidence effect; characterized cases | HIGH; core implementer, conformance engineer | Intentional change versus regression; closes executable truth. |
+| P016 Change Ledger and Revisions; D12 | §§10.2, 19–22 | P015 accepted | Append-only CHG, bitemporal fields and derived revisions; history tests | HIGH; schema engineer, core implementer, conformance engineer | Sole writer and time provenance; temporal foundation. |
+| P017 Derived Divergences; D13 | §23 | P016 accepted | Structural/scenario derivation, stable IDs and preserved disposition; repeat-build tests | CRITICAL; core implementer, conformance engineer | No manual DIV and no false behavioral claim; separate derivation. |
+| P018 Semantic Diff; D14 | §§24–25 | P017 accepted | `kf diff` with UNCHANGED and proof labels; negative assertion tests | HIGH; core implementer, conformance engineer | No unsupported negative claims; distinct output contract. |
+| P019 Releases and Baselines; D15 | §§19, 21, 30, 41 | P018 accepted | CalVer, baselines and sync-status; clean-history cases | HIGH; core implementer, integration engineer | Git time and multi-repo comparisons; closes temporal phase. |
+| P020 Faceted Graph Build; E16 | §§7, 9.2, 40 | P019 accepted | Derived graph and indexes; clean rebuild tests | HIGH; core implementer, integration engineer | Single edge owner and rebuild from text; isolated projection. |
+| P021 Safe Context Packs; E17 | §§18.7, 38 | P020 accepted | `kf context` and minimum-budget failure; safe-context cases | HIGH; core implementer, conformance engineer | No truncation of disputes/unknowns/DIV; graph prerequisite. |
+| P022 Impact Analysis; E18 | §§25, 39 | P021 accepted | Directed impact and labeled negatives; bounded graph cases | HIGH; core implementer, conformance engineer | Traversal limits and observed impact; distinct analysis. |
+| P023 Canonical Agents and Export; E19 | §§45–49 | P022 accepted | Provider-neutral definitions, facet permissions and export; permission tests | HIGH; core implementer, integration engineer | Disjoint write authority; closes graph/agent phase. |
+| P024 Mappings and Verification; F20 | §§16, 28 | P023 accepted | Implementation/test mapping anchors and drift verification; mapping cases | HIGH; core implementer, conformance engineer | Reuse of resolver contract; isolated incentive prerequisite. |
+| P025 PR Check and Ack; F21 | §29 | P024 accepted | `kf pr-check`, append-only ack and GitHub/ADO adapters; PR diff cases | HIGH; core implementer, integration engineer | Two one-command paths and durable trail; separate integration. |
+| P026 SME Questions and Interviews; F22 | §§18, 40 | P025 accepted | Five-source queue, priorities and interview pack/import; queue cases | HIGH; core implementer, conformance engineer | Exhaustion before asking humans; closes incentive phase. |
+| P027 Milestone 1 Integration; G portion required by §56 | §§33–35, 43, 50, 52, 55–56 | P026 accepted | Work item ingestion/refinement, complete §55 fixture and end-to-end CI | CRITICAL; core implementer, conformance engineer, integration engineer | Exact expected outputs and clean checkout; integrates remaining Milestone 1 scope. |
 
-| Phase | Name | Status | Codex handoff | Claude verdict |
-|---|---|---|---|---|
-| P001 | Unassigned | PLANNED | — | — |
+Portal, chatbot, Graph DB and webhooks from §53 G require separate future authorization. The P001 fixture is intentionally partial; derived `DIV` files are never populated manually. This roadmap never changes the normative CLI name `kf`.
+
+## Phase registry
+
+| Phase | Status | Plan | Traceability | Codex handoff | Claude verdict |
+|---|---|---|---|---|---|
+| P001 | CODEX_IMPLEMENTING | [PLAN](phases/P001-core-persistent-model/PLAN.md) | [TRACEABILITY](phases/P001-core-persistent-model/TRACEABILITY.md) | Pending | Pending |
+| P002–P027 | Proposed; not authorized | Created when authorized | — | — | — |

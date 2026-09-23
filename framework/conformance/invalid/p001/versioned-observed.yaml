@@ -1,0 +1,8 @@
+schema_version: 2.1
+entity: BP-0001
+facet: observed
+target: {repository: legacy-app}
+as_of: 2026-11-02
+observed_against: {repository: legacy-app, commit: abc123def}
+version: 2
+steps: []

@@ -1,0 +1,10 @@
+schema_version: 2.1
+entity: DE-0001
+facet: observed
+target: {repository: legacy-app, environment: production}
+as_of: 2026-11-02
+observed_against: {repository: legacy-app, commit: abc123def}
+fields:
+  concentration: {type: decimal, precision: 8, scale: 2}
+persistence: {kind: relational, table: formulations, column: concentration}
+discovery: {method: database-schema, agent: archaeologist}

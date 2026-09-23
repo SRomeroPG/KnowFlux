@@ -1,0 +1,4 @@
+schema_version: 2.0
+id: CAP-0001
+type: capability
+name: Invalid old-format capability

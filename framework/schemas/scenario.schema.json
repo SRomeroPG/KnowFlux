@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/scenario.schema.json",
+  "type": "object",
+  "allOf": [ { "$ref": "common.schema.json#/$defs/entityBase" }, { "$ref": "common.schema.json#/$defs/authoredRootNames" } ],
+  "required": ["id", "asserts", "given", "when", "then"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^SC-[0-9]{4,}$" },
+    "type": { "const": "scenario" },
+    "scenario_kind": { "enum": ["happy-path", "edge", "exception", "regression", "characterization"] },
+    "asserts": {
+      "type": "object",
+      "required": ["facet"],
+      "properties": {
+        "facet": { "enum": ["specified", "observed"] },
+        "target": { "oneOf": [ { "type": "null" }, { "type": "string", "minLength": 1 }, { "$ref": "common.schema.json#/$defs/target" } ] }
+      },
+      "if": { "properties": { "facet": { "const": "observed" } }, "required": ["facet"] },
+      "then": { "required": ["target"], "properties": { "target": { "not": { "type": "null" } } } },
+      "else": { "properties": { "target": { "type": "null" } } },
+      "additionalProperties": false
+    },
+    "given": { "type": "object" },
+    "when": { "type": "string" },
+    "then": { "type": "object", "required": ["exercises", "expected"], "properties": {
+      "exercises": { "$ref": "common.schema.json#/$defs/brIds" },
+      "outcome": { "$ref": "common.schema.json#/$defs/outId" },
+      "expected": { "type": "object" }
+    }, "additionalProperties": true },
+    "covers": { "$ref": "common.schema.json#/$defs/bpIds" }
+  },
+  "propertyNames": { "not": { "enum": ["specified", "observed", "facet"] } },
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/evidence.schema.json",
+  "type": "object",
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/entityBase" },
+    { "$ref": "common.schema.json#/$defs/authoredRootNames" },
+    {
+      "if": { "properties": { "type": { "enum": ["source-code", "database-schema", "stored-procedure", "configuration", "api-contract", "runtime-observation", "log", "golden-master", "experiment"] } }, "required": ["type"] },
+      "then": { "properties": { "supports": { "type": "array", "items": { "not": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#specified(?:@v[0-9]+|\\[[A-Za-z0-9_=;,-]+\\])?(?:\\.|$)" } } } } }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["sme-validation", "policy-document", "regulatory-document", "business-decision", "approved-change"] } }, "required": ["type"] },
+      "then": { "properties": { "supports": { "type": "array", "items": { "not": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#observed:" } } } } }
+    }
+  ],
+  "required": ["id", "type", "assertion_kind", "supports"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^EV-[0-9]{4,}$" },
+    "type": { "enum": ["source-code", "database-schema", "stored-procedure", "configuration", "api-contract", "runtime-observation", "log", "golden-master", "experiment", "sme-validation", "policy-document", "regulatory-document", "business-decision", "approved-change", "documentation", "ticket", "manual-process"] },
+    "assertion_kind": { "enum": ["fact", "interpretation"] },
+    "supports": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/supportAddress" } },
+    "anchor": { "type": "object", "properties": {
+      "resolver": { "type": "string" }, "repository": { "type": "string" }, "path": { "type": "string" },
+      "symbol": { "type": "string" }, "symbol_kind": { "type": "string" },
+      "content_sha": { "type": "string" },
+      "hint_lines": { "type": "object", "properties": { "start": { "type": "integer", "minimum": 1 }, "end": { "type": "integer", "minimum": 1 } }, "additionalProperties": false }
+    }, "additionalProperties": true },
+    "observed": { "type": "object", "properties": {
+      "commit": { "type": "string" }, "branch": { "type": "string" }, "at": { "type": "string", "format": "date-time" }
+    }, "additionalProperties": true },
+    "source": { "type": "object" },
+    "revalidate_after": { "type": "string" },
+    "verification": { "$ref": "common.schema.json#/$defs/verification" },
+    "excerpt": { "type": "string" },
+    "statement": { "type": "string" },
+    "artifact": { "type": "object", "properties": { "uri": { "type": "string" }, "sha256": { "type": "string" }, "size_bytes": { "type": "integer", "minimum": 0 } }, "additionalProperties": true }
+  },
+  "propertyNames": { "not": { "enum": ["specified", "facet"] } },
+  "unevaluatedProperties": false
+}

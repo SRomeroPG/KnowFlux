@@ -1,0 +1,10 @@
+schema_version: 2.1
+id: SC-0002
+type: scenario
+name: Legacy concentration characterization
+scenario_kind: characterization
+asserts: {facet: observed, target: legacy-app}
+given: {business_unit: A, concentration: {value: "4.5", unit: percent_mass}}
+when: Formulation is submitted
+then: {exercises: [BR-0001], expected: {valid: true}}
+covers: [BP-0001]

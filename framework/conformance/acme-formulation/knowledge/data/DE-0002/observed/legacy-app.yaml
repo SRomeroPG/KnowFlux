@@ -1,0 +1,9 @@
+schema_version: 2.1
+entity: DE-0002
+facet: observed
+target: {repository: legacy-app}
+as_of: 2026-11-02
+observed_against: {repository: legacy-app, commit: abc123def}
+fields: {material_code: {type: string}}
+persistence: {kind: relational, table: legacy_materials}
+discovery: {method: database-schema, agent: archaeologist}

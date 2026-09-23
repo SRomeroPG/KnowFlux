@@ -1,0 +1,8 @@
+schema_version: 2.1
+id: DSP-0001
+type: dispute
+disputes: {entity: BR-0001, facet: specified}
+raised_by: {type: human, role: qa}
+claim: The specified limit may differ in business unit B.
+counter_evidence: [EV-0001]
+status: open

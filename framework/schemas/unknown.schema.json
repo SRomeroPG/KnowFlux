@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/unknown.schema.json",
+  "type": "object",
+  "allOf": [ { "$ref": "common.schema.json#/$defs/entityBase" }, { "$ref": "common.schema.json#/$defs/authoredRootNames" } ],
+  "required": ["id", "question", "status"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^UNK-[0-9]{4,}$" },
+    "type": { "const": "unknown" },
+    "question": { "type": "string" },
+    "why_it_matters": { "type": "string" },
+    "blocks": { "type": "array", "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/entityAddress" } },
+    "evidence": { "type": "array", "items": { "type": "string", "pattern": "^EV-[0-9]{4,}$" } },
+    "required_source": { "type": "object" },
+    "attempts": { "type": "array", "items": { "type": "object", "required": ["method", "at", "result"], "properties": {
+      "method": { "type": "string" }, "at": { "type": "string", "format": "date" }, "result": { "type": "string" }
+    }, "additionalProperties": true } },
+    "status": { "enum": ["open", "answered", "obsolete"] }
+  },
+  "propertyNames": { "not": { "enum": ["specified", "observed", "facet"] } },
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/business-process-specified.schema.json",
+  "type": "object",
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/specifiedFacetBase" },
+    { "$ref": "common.schema.json#/$defs/facetNames" },
+    { "$ref": "#/$defs/processPayload" }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" },
+        "executes": { "$ref": "common.schema.json#/$defs/brIds" },
+        "reads": { "$ref": "common.schema.json#/$defs/deIds" },
+        "writes": { "$ref": "common.schema.json#/$defs/deIds" },
+        "produces": { "$ref": "common.schema.json#/$defs/outIds" },
+        "calls": { "type": "array", "items": { "type": "string", "pattern": "^INT-[0-9]{4,}$" } },
+        "triggered_by": { "type": "array", "items": { "type": "string", "pattern": "^EVT-[0-9]{4,}$" } },
+        "performed_by": { "type": "array", "items": { "type": "string", "pattern": "^ACT-[0-9]{4,}$" } },
+        "transitions": { "type": "array", "items": { "type": "string", "pattern": "^ST-[0-9]{4,}$" } }
+      },
+      "allOf": [ { "$ref": "common.schema.json#/$defs/facetNames" } ],
+      "additionalProperties": false
+    },
+    "processPayload": {
+      "type": "object",
+      "required": ["steps"],
+      "properties": {
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "executes": { "$ref": "common.schema.json#/$defs/brIds" },
+        "reads": { "$ref": "common.schema.json#/$defs/deIds" },
+        "writes": { "$ref": "common.schema.json#/$defs/deIds" },
+        "produces": { "$ref": "common.schema.json#/$defs/outIds" },
+        "calls": { "type": "array", "items": { "type": "string", "pattern": "^INT-[0-9]{4,}$" } },
+        "triggered_by": { "type": "array", "items": { "type": "string", "pattern": "^EVT-[0-9]{4,}$" } },
+        "performed_by": { "type": "array", "items": { "type": "string", "pattern": "^ACT-[0-9]{4,}$" } },
+        "transitions": { "type": "array", "items": { "type": "string", "pattern": "^ST-[0-9]{4,}$" } }
+      }
+    }
+  }
+}

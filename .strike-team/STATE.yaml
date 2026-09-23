@@ -1,13 +1,13 @@
 schema_version: 1
 
-project: knowledge-framework
+project: knowflux
 normative_spec: knowledge-framework-spec-v2.1
 spec_status: frozen
 
 current_phase:
   id: P001
-  name: Unassigned
-  status: PLANNED
+  name: Repository Foundation + Core Persistent Model
+  status: CODEX_IMPLEMENTING
   audit_round: 0
 
 status_values:
@@ -24,4 +24,4 @@ status_values:
 last_codex_commit: null
 last_claude_audit: null
 open_required_findings: 0
-open_spec_gaps: []
+open_spec_gaps: [SG-0001]

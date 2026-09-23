@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/divergence.schema.json",
+  "type": "object",
+  "allOf": [ { "$ref": "common.schema.json#/$defs/entityBase" }, { "$ref": "common.schema.json#/$defs/authoredRootNames" } ],
+  "required": ["id", "detected", "disposition"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^DIV-[0-9]{4,}$" },
+    "type": { "const": "divergence" },
+    "detected": {
+      "type": "object",
+      "required": ["key", "entity", "comparison", "difference", "classification", "proof", "state"],
+      "properties": {
+        "key": { "type": "string" },
+        "entity": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}$" },
+        "comparison": { "type": "object", "required": ["specified", "observed"], "properties": {
+          "specified": { "$ref": "common.schema.json#/$defs/specifiedAddress" },
+          "observed": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#observed:[^\\s#]+$" }
+        }, "additionalProperties": false },
+        "difference": { "type": "object", "required": ["path"], "properties": {
+          "path": { "type": "string" }, "specified": {}, "observed": {}
+        }, "additionalProperties": false },
+        "classification": { "enum": ["structural-difference", "behavioral-divergence", "undetermined"] },
+        "proof": { "type": "object", "properties": {
+          "mechanism": { "enum": ["scenario-differential", "path-diff"] },
+          "failing_scenarios": { "type": "array", "items": { "type": "string", "pattern": "^SC-[0-9]{4,}$" } }
+        }, "additionalProperties": true },
+        "first_detected": { "type": "string", "format": "date" },
+        "last_confirmed": { "type": "string", "format": "date" },
+        "state": { "enum": ["present", "absent", "superseded"] }
+      },
+      "additionalProperties": false
+    },
+    "disposition": { "type": "object", "properties": {
+      "status": { "enum": ["open", "accepted", "resolving", "resolved"] },
+      "reason": { "type": "string" },
+      "owner": { "$ref": "common.schema.json#/$defs/authority" },
+      "expires": { "type": "string", "format": "date" },
+      "resolution": { "type": "object", "properties": {
+        "kind": { "enum": ["change", "work-item", "evidence-correction"] },
+        "ref": { "type": "string" }
+      }, "additionalProperties": true }
+    }, "additionalProperties": true }
+  },
+  "propertyNames": { "not": { "enum": ["specified", "observed", "facet", "statement"] } },
+  "unevaluatedProperties": false
+}

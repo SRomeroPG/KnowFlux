@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/common.schema.json",
+  "$defs": {
+    "schemaVersion": { "type": "number", "const": 2.1 },
+    "idStatus": { "enum": ["provisional", "permanent"] },
+    "entityId": { "type": "string", "pattern": "^(CAP|BP|BR|DE|OUT|SC|EV|UNK|CHG|DIV|DSP)-[0-9]{4,}$" },
+    "bpId": { "type": "string", "pattern": "^BP-[0-9]{4,}$" },
+    "brId": { "type": "string", "pattern": "^BR-[0-9]{4,}$" },
+    "deId": { "type": "string", "pattern": "^DE-[0-9]{4,}$" },
+    "outId": { "type": "string", "pattern": "^OUT-[0-9]{4,}$" },
+    "capId": { "type": "string", "pattern": "^CAP-[0-9]{4,}$" },
+    "brIds": { "type": "array", "items": { "$ref": "#/$defs/brId" }, "uniqueItems": true },
+    "deIds": { "type": "array", "items": { "$ref": "#/$defs/deId" }, "uniqueItems": true },
+    "outIds": { "type": "array", "items": { "$ref": "#/$defs/outId" }, "uniqueItems": true },
+    "bpIds": { "type": "array", "items": { "$ref": "#/$defs/bpId" }, "uniqueItems": true },
+    "entityAddress": { "type": "string", "pattern": "^(CAP|BP|BR|DE|OUT|SC|EV|UNK|CHG|DIV|DSP)-[0-9]{4,}(?:#(?:specified(?:@v[0-9]+|\\[[A-Za-z0-9_=;,-]+\\])?|observed:[^\\s#]+))?(?:\\.[A-Za-z_][A-Za-z0-9_-]*)?$" },
+    "facetAddress": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#(?:specified(?:@v[0-9]+|\\[[A-Za-z0-9_=;,-]+\\])?|observed:[^\\s#]+)(?:\\.[A-Za-z_][A-Za-z0-9_-]*)?$" },
+    "specifiedAddress": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#specified(?:@v[0-9]+|\\[[A-Za-z0-9_=;,-]+\\])?$" },
+    "supportAddress": {
+      "oneOf": [
+        { "$ref": "#/$defs/facetAddress" },
+        { "type": "string", "pattern": "^(CAP|OUT|SC|EV|UNK|CHG|DIV|DSP)-[0-9]{4,}$" }
+      ]
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": ["status"],
+      "properties": { "status": { "enum": ["draft", "active", "deprecated", "retired"] } },
+      "additionalProperties": false
+    },
+    "confidence": { "enum": ["unknown", "inferred", "supported", "corroborated", "confirmed"] },
+    "authority": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "role": { "type": "string" },
+        "ref": { "type": "string" },
+        "user": { "type": "string" },
+        "at": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": true
+    },
+    "epistemic": {
+      "type": "object",
+      "properties": {
+        "computed_confidence": { "$ref": "#/$defs/confidence" },
+        "effective_confidence": { "$ref": "#/$defs/confidence" },
+        "override": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["value", "authority", "at", "reason"],
+              "properties": {
+                "value": { "$ref": "#/$defs/confidence" },
+                "authority": { "$ref": "#/$defs/authority" },
+                "at": { "type": "string", "format": "date" },
+                "reason": { "type": "string" },
+                "expires": { "type": "string", "format": "date" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "contested": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["attested", "external-test"] },
+        "state": { "enum": ["fresh", "stale", "broken", "unverifiable", "needs-revalidation"] },
+        "last_verified_at": { "type": "string", "format": "date-time" },
+        "verified_against": { "type": "object" },
+        "attested_by": { "$ref": "#/$defs/authority" },
+        "external_test": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "oneOf": [ { "type": "string" }, { "type": "number" }, { "type": "boolean" } ] },
+          { "type": "array", "items": { "oneOf": [ { "type": "string" }, { "type": "number" }, { "type": "boolean" } ] }, "uniqueItems": true }
+        ]
+      }
+    },
+    "validity": {
+      "type": "object",
+      "required": ["effective_from"],
+      "properties": {
+        "effective_from": { "type": "string", "format": "date" },
+        "effective_until": { "type": ["string", "null"], "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": { "scope": { "$ref": "#/$defs/scope" } },
+      "additionalProperties": { "oneOf": [ { "type": "string" }, { "type": "number" }, { "type": "boolean" } ] }
+    },
+    "specifiedFacetBase": {
+      "type": "object",
+      "required": ["scope", "validity"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "scope": { "$ref": "#/$defs/scope" },
+        "validity": { "$ref": "#/$defs/validity" },
+        "authority": { "$ref": "#/$defs/authority" },
+        "epistemic": { "$ref": "#/$defs/epistemic" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "observedFacetBase": {
+      "type": "object",
+      "required": ["schema_version", "entity", "facet", "target", "as_of", "observed_against"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "entity": { "type": "string" },
+        "facet": { "const": "observed" },
+        "target": { "$ref": "#/$defs/target" },
+        "as_of": { "type": "string", "format": "date" },
+        "observed_against": { "type": "object" },
+        "epistemic": { "$ref": "#/$defs/epistemic" },
+        "discovery": { "type": "object" },
+        "verification": { "$ref": "#/$defs/verification" }
+      },
+      "propertyNames": { "not": { "const": "version" } }
+    },
+    "quantity": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "string", "pattern": "^-?(?:[0-9]+)(?:\\.[0-9]+)?$" },
+        "unit": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "scalarOrQuantity": { "oneOf": [ { "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" }, { "$ref": "#/$defs/quantity" } ] },
+    "entityBase": {
+      "type": "object",
+      "required": ["schema_version", "id"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "id": { "$ref": "#/$defs/entityId" },
+        "id_status": { "$ref": "#/$defs/idStatus" },
+        "name": { "type": "string" },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" }
+      }
+    },
+    "authoredRootNames": {
+      "type": "object",
+      "propertyNames": {
+        "not": { "enum": ["created_at", "updated_at", "recorded_at", "approved", "disputed", "confidence", "executed_by", "supported_by", "exercised_by", "covered_by", "governed_by", "produced_by", "read_by", "written_by", "called_by", "overridden_by", "blocked_by", "affected_by", "is_disputed", "part_of_entity", "triggers", "performs", "transitioned_by"] }
+      }
+    },
+    "facetNames": {
+      "type": "object",
+      "propertyNames": {
+        "not": { "enum": ["created_at", "updated_at", "recorded_at", "approved", "disputed", "confidence", "executed_by", "supported_by", "exercised_by", "covered_by", "governed_by", "produced_by", "read_by", "written_by", "called_by", "overridden_by", "blocked_by", "affected_by", "is_disputed", "part_of_entity", "triggers", "performs", "transitioned_by"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+schema_version: 2.1
+id: BR-0001
+type: business-rule
+name: Maximum concentration
+identity:
+  rule_kind: invariant
+  subject: formulation concentration
+  determination: whether concentration is permitted
+  governs: [DE-0001.concentration]
+  produces: [OUT-0001]
+lifecycle: {status: active}
+specified:
+  - version: 1
+    scope: {business_unit: [A]}
+    validity: {effective_from: 2026-10-01, effective_until: 2027-02-28}
+    logic:
+      kind: decision-table
+      hit_policy: first
+      exhaustive: true
+      inputs: [{ref: DE-0001.concentration, type: quantity, unit: percent_mass}]
+      rules:
+        - id: r1
+          when: {concentration: {lte: {value: "4.2", unit: percent_mass}}}
+          then: {valid: true, outcome: OUT-0001}
+        - id: r2
+          when: default
+          then: {valid: false}
+  - version: 2
+    scope: {business_unit: [A]}
+    validity: {effective_from: 2027-03-01, effective_until: null}
+    logic:
+      kind: decision-table
+      hit_policy: first
+      exhaustive: true
+      inputs: [{ref: DE-0001.concentration, type: quantity, unit: percent_mass}]
+      rules:
+        - id: r1
+          when: {concentration: {lte: {value: "4.0", unit: percent_mass}}}
+          then: {valid: true, outcome: OUT-0001}
+        - id: r2
+          when: default
+          then: {valid: false}

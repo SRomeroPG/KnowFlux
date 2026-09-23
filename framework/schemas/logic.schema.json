@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/logic.schema.json",
+  "$defs": {
+    "predicate": {
+      "oneOf": [
+        { "type": "object", "required": ["all"], "properties": { "all": { "type": "array", "items": { "$ref": "#/$defs/predicate" } } }, "additionalProperties": false },
+        { "type": "object", "required": ["any"], "properties": { "any": { "type": "array", "items": { "$ref": "#/$defs/predicate" } } }, "additionalProperties": false },
+        { "type": "object", "required": ["not"], "properties": { "not": { "$ref": "#/$defs/predicate" } }, "additionalProperties": false },
+        { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/matcher" } }
+      ]
+    },
+    "matcher": {
+      "oneOf": [
+        { "oneOf": [ { "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" } ] },
+        { "$ref": "common.schema.json#/$defs/quantity" },
+        { "type": "object", "minProperties": 1, "maxProperties": 1, "properties": {
+          "eq": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" }, "ne": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" },
+          "lt": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" }, "lte": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" },
+          "gt": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" }, "gte": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" },
+          "in": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" } },
+          "not_in": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" } },
+          "between": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "common.schema.json#/$defs/scalarOrQuantity" } },
+          "matches": { "type": "string" }, "is_null": { "type": "boolean" }
+        }, "additionalProperties": false }
+      ]
+    },
+    "expression": {
+      "oneOf": [
+        { "type": "object", "required": ["ref"], "properties": { "ref": { "type": "string" } }, "additionalProperties": false },
+        { "type": "object", "required": ["const"], "properties": { "const": { "type": "string" }, "unit": { "type": "string" } }, "additionalProperties": false },
+        { "type": "object", "required": ["op", "args"], "properties": {
+          "op": { "enum": ["add", "subtract", "multiply", "divide", "min", "max", "abs", "round", "clamp"] },
+          "args": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/expression" } }
+        }, "additionalProperties": false },
+        { "type": "object", "required": ["op", "cond", "then", "else"], "properties": {
+          "op": { "const": "if" },
+          "cond": { "$ref": "#/$defs/predicate" },
+          "then": { "$ref": "#/$defs/expression" },
+          "else": { "$ref": "#/$defs/expression" }
+        }, "additionalProperties": false }
+      ]
+    },
+    "decisionTable": {
+      "type": "object",
+      "required": ["kind", "hit_policy", "exhaustive", "inputs", "rules"],
+      "properties": {
+        "kind": { "const": "decision-table" },
+        "hit_policy": { "enum": ["first", "unique", "collect"] },
+        "exhaustive": { "type": "boolean" },
+        "inputs": { "type": "array", "items": { "type": "object", "required": ["ref", "type"], "properties": {
+          "ref": { "type": "string" }, "type": { "type": "string" }, "unit": { "type": "string" }, "domain": { "type": "array" }
+        }, "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] }, "then": { "required": ["domain"], "properties": { "domain": {} } }, "additionalProperties": true } },
+        "rules": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["id", "when", "then"], "properties": {
+          "id": { "type": "string" },
+          "when": { "oneOf": [ { "const": "default" }, { "type": "object", "maxProperties": 0 }, { "$ref": "#/$defs/predicate" } ] },
+          "then": { "type": "object" }
+        }, "additionalProperties": false } }
+      },
+      "additionalProperties": false
+    },
+    "formula": {
+      "type": "object",
+      "required": ["kind", "output", "expression"],
+      "properties": {
+        "kind": { "const": "formula" },
+        "output": { "type": "object", "required": ["ref", "unit"], "properties": { "ref": { "type": "string" }, "unit": { "type": "string" } }, "additionalProperties": false },
+        "expression": { "$ref": "#/$defs/expression" },
+        "rounding": { "type": "object", "required": ["mode", "decimals"], "properties": { "mode": { "enum": ["half-even", "half-up", "down", "up"] }, "decimals": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+        "guards": { "type": "array", "items": { "type": "object", "required": ["when", "raise"], "properties": { "when": { "$ref": "#/$defs/predicate" }, "raise": { "type": "string", "pattern": "^OUT-[0-9]{4,}$" } }, "additionalProperties": false } }
+      },
+      "additionalProperties": false
+    },
+    "stateMachine": {
+      "type": "object",
+      "required": ["kind", "entity", "state_field", "states", "initial", "terminal", "completeness", "transitions"],
+      "properties": {
+        "kind": { "const": "state-machine" },
+        "entity": { "type": "string", "pattern": "^DE-[0-9]{4,}$" },
+        "state_field": { "type": "string" },
+        "states": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true },
+        "initial": { "type": "string" },
+        "terminal": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "completeness": { "enum": ["total", "partial"] },
+        "transitions": { "type": "array", "items": { "type": "object", "required": ["id", "from", "to", "trigger"], "properties": {
+          "id": { "type": "string" }, "from": { "type": "string" }, "to": { "type": "string" },
+          "trigger": { "type": "string", "pattern": "^EVT-[0-9]{4,}$" },
+          "guard": { "type": "object" }, "produces": { "type": "string", "pattern": "^OUT-[0-9]{4,}$" },
+          "performed_by": { "type": "string", "pattern": "^ACT-[0-9]{4,}$" },
+          "priority": { "type": "integer" }
+        }, "additionalProperties": true } }
+      },
+      "additionalProperties": false
+    },
+    "narrative": {
+      "type": "object",
+      "required": ["kind", "unstructured_reason"],
+      "properties": { "kind": { "const": "narrative" }, "unstructured_reason": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/decisionTable" },
+    { "$ref": "#/$defs/formula" },
+    { "$ref": "#/$defs/stateMachine" },
+    { "$ref": "#/$defs/narrative" }
+  ]
+}

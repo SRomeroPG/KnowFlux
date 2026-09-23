@@ -1,0 +1,14 @@
+schema_version: 2.1
+id: BR-0001
+type: business-rule
+identity:
+  rule_kind: invariant
+  subject: concentration
+  determination: whether concentration is permitted
+  governs: [DE-0001.concentration]
+specified:
+  scope: {business_unit: [A]}
+  validity: {effective_from: 2026-10-01}
+  logic: {kind: narrative, unstructured_reason: Human judgment is required}
+  verification: {mode: attested}
+executed_by: [BP-0001]

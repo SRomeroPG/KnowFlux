@@ -1,0 +1,5 @@
+schema_version: 2.1
+id: OUT-0001
+type: outcome
+name: Formulation accepted
+lifecycle: {status: active}

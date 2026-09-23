@@ -1,0 +1,14 @@
+schema_version: 2.1
+id: BP-0001
+type: business-process
+name: Submit formulation
+part_of: CAP-0001
+lifecycle: {status: active}
+specified:
+  version: 1
+  scope: {business_unit: [A]}
+  validity: {effective_from: 2026-10-01, effective_until: null}
+  steps:
+    - {id: s1, name: Validate concentration, executes: [BR-0001], reads: [DE-0001]}
+    - {id: s2, name: Save formulation, writes: [DE-0001]}
+  produces: [OUT-0001]

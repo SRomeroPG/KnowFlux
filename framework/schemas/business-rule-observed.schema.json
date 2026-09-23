@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://knowflux.dev/schemas/business-rule-observed.schema.json",
+  "type": "object",
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/observedFacetBase" },
+    { "$ref": "common.schema.json#/$defs/facetNames" },
+    {
+      "type": "object",
+      "properties": {
+        "entity": { "$ref": "common.schema.json#/$defs/brId" },
+        "logic": { "$ref": "logic.schema.json" }
+      },
+      "if": { "type": "object", "properties": { "logic": { "type": "object", "properties": { "kind": { "const": "narrative" } }, "required": ["kind"] } }, "required": ["logic"] },
+      "then": { "type": "object", "required": ["verification"], "properties": { "verification": { "type": "object", "required": ["mode"], "properties": { "mode": {} } } } }
+    }
+  ],
+  "required": ["logic"],
+  "unevaluatedProperties": false
+}
