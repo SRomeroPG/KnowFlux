@@ -10,7 +10,7 @@
   "properties": {
     "id": { "$ref": "common.schema.json#/$defs/deId" },
     "type": { "const": "data-entity" },
-    "identity": { "type": "object", "allOf": [ { "$ref": "common.schema.json#/$defs/authoredRootNames" } ], "additionalProperties": true },
+    "identity": { "type": "object", "additionalProperties": false },
     "contains": { "$ref": "common.schema.json#/$defs/deIds" },
     "specified": {
       "oneOf": [

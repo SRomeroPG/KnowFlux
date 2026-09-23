@@ -11,5 +11,5 @@
     "id": { "type": "string", "pattern": "^CAP-[0-9]{4,}$" },
     "type": { "const": "capability" }
   },
-  "propertyNames": { "not": { "enum": ["specified", "observed", "facet", "truth_state", "logic", "evidence", "part_of", "executes", "reads", "writes", "produces", "calls", "triggered_by", "performed_by", "transitions", "governs", "overrides", "contains", "exercises", "covers", "supports", "blocks", "affects", "disputes"] } }
+  "unevaluatedProperties": false
 }

@@ -66,4 +66,5 @@ All P001 schemas and fixture tests pass; traceability is current; internal revie
 
 ## Known spec gaps
 - [SG-0001](../../spec-gaps/SG-0001.md) concerns a later scenario-count validator, so does not block P001.
-- DE field/persistence and CAP/OUT payload grammar are not fully prescribed. P001 leaves undocumented payload details open rather than introducing an unstated product contract; this does not block the specified structural checks.
+- [SG-0002](../../spec-gaps/SG-0002.md) was discovered in Claude audit R01 and concerns later observed-target and scope-address parsing. P001's open target/scope maps leave the decision unresolved without blocking this phase.
+- DE field/persistence payload grammar is not fully prescribed. P001 leaves those payload details open rather than introducing an unstated product contract. CAP/OUT roots are closed to common entity fields because the specification places their descriptive prose in Markdown and defines no additional YAML payload.

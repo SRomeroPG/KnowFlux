@@ -8,6 +8,7 @@ import { loadSchemas } from '../scripts/check-schemas.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = path.join(root, 'framework', 'conformance', 'acme-formulation');
+const specExamples = path.join(root, 'framework', 'conformance', 'spec-examples');
 const schemaBase = 'https://knowflux.dev/schemas/';
 
 // This manifest is an assertion about the §55 P001 corpus, not schema discovery.
@@ -46,11 +47,19 @@ for (const [, name] of examples) validators.set(name, ajv.getSchema(`${schemaBas
 validators.set('divergence', ajv.getSchema(`${schemaBase}divergence.schema.json`));
 
 async function parseExample(relative) {
-  const source = await readFile(path.join(fixture, relative), 'utf8');
+  return parseYAML(path.join(fixture, relative), relative);
+}
+
+async function parseYAML(file, label) {
+  const source = await readFile(file, 'utf8');
   const documents = YAML.parseAllDocuments(source, { uniqueKeys: true });
-  assert.equal(documents.length, 1, `${relative}: exactly one YAML document`);
-  assert.equal(documents[0].errors.length, 0, `${relative}: ${documents[0].errors}`);
+  assert.equal(documents.length, 1, `${label}: exactly one YAML document`);
+  assert.equal(documents[0].errors.length, 0, `${label}: ${documents[0].errors}`);
   return documents[0].toJS();
+}
+
+async function parseSpecExample(relative) {
+  return parseYAML(path.join(specExamples, relative), relative);
 }
 
 function validate(name, value) {
@@ -84,6 +93,25 @@ function negative(label, schema, base, mutate, expectedPath) {
       `${label}: expected diagnostic at ${expectedPath}, got ${JSON.stringify(first.diagnostics)}`);
     const second = validate(schema, changed);
     assert.deepEqual(second, first, `${label}: nondeterministic diagnostics`);
+  });
+}
+
+function expectInvalidAt(label, schema, changed, location, property) {
+  const first = validate(schema, changed);
+  assert.equal(first.valid, false, `${label} unexpectedly accepted`);
+  assert.ok(first.diagnostics.some(({ instancePath, params }) =>
+    instancePath.startsWith(location) && (!property ||
+      ['propertyName', 'additionalProperty', 'unevaluatedProperty', 'missingProperty']
+        .some((key) => params[key] === property))),
+  `${label}: expected ${property ?? 'error'} at ${location}, got ${JSON.stringify(first.diagnostics)}`);
+  assert.deepEqual(validate(schema, changed), first, `${label}: nondeterministic diagnostics`);
+}
+
+function nestedNegative(label, schema, base, mutate, location, property) {
+  test(label, async () => {
+    const changed = JSON.parse(JSON.stringify(await parseExample(base)));
+    mutate(changed);
+    expectInvalidAt(label, schema, changed, location, property);
   });
 }
 
@@ -140,8 +168,8 @@ test('§55: no DIV record manually populates the fixture', async () => {
   assert.ok(!entries.includes('divergences'));
 });
 
-test('§23.3: schema recognizes an engine-derived DIV without duplicate statement', () => {
-  const derived = {
+function specDiv() {
+  return {
     schema_version: 2.1, id: 'DIV-0001',
     detected: {
       key: '7f21a9', entity: 'BR-0001',
@@ -151,10 +179,47 @@ test('§23.3: schema recognizes an engine-derived DIV without duplicate statemen
     },
     disposition: { status: 'open' },
   };
+}
+
+test('§23.3: schema recognizes an engine-derived DIV without duplicate statement', () => {
+  const derived = specDiv();
   assert.equal(validate('divergence', derived).valid, true);
   const duplicate = validate('divergence', { ...derived, statement: 'legacy is wrong' });
   assert.equal(duplicate.valid, false);
   assert.ok(hasExpectedDiagnostic(duplicate.diagnostics, '@statement'), JSON.stringify(duplicate.diagnostics));
+});
+
+for (const [section, file, schema, observedAt] of [
+  ['§10.3', '10.3-greenfield-rule.yaml', 'business-rule', null],
+  ['§16.3', '16.3-source-code-evidence.yaml', 'evidence', '2026-10-14T09:12:00Z'],
+  ['§16.6', '16.6-sme-evidence.yaml', 'evidence', '2026-10-14'],
+]) {
+  test(`${section} frozen example validates: ${file}`, async () => {
+    const value = await parseSpecExample(file);
+    assert.equal(value.schema_version, 2.1);
+    if (observedAt) assert.equal(value.observed.at, observedAt);
+    else assert.equal(value.specified.verification.last_verified_at, '2026-10-14');
+    const result = validate(schema, value);
+    assert.equal(result.valid, true, JSON.stringify(result.diagnostics));
+    assert.deepEqual(validate(schema, value), result);
+  });
+}
+
+test('§23.3 frozen DIV structure validates only in memory', () => {
+  const value = specDiv();
+  value.id = 'DIV-0007';
+  value.detected.classification = 'behavioral-divergence';
+  value.detected.proof = { mechanism: 'scenario-differential', failing_scenarios: ['SC-0041', 'SC-0078'] };
+  value.detected.first_detected = '2026-11-02';
+  value.detected.last_confirmed = '2027-01-15';
+  value.disposition = {
+    status: 'accepted', reason: 'Known divergence',
+    owner: { type: 'human', role: 'product-owner' }, expires: '2027-09-30',
+    resolution: { kind: 'work-item', ref: 'BUG-9182' },
+  };
+  const result = validate('divergence', value);
+  assert.equal(result.valid, true, JSON.stringify(result.diagnostics));
+  assert.deepEqual(validate('divergence', value), result);
 });
 
 const bp = 'knowledge/processes/BP-0001/process.yaml';
@@ -170,6 +235,103 @@ const sc = 'knowledge/scenarios/SC-0002/scenario.yaml';
 const ev = 'knowledge/evidence/EV-0001/evidence.yaml';
 const chg = 'changes/CHG-0001.yaml';
 const dsp = 'knowledge/disputes/DSP-0001/dispute.yaml';
+
+test('§10.3 last_verified_at accepts a date but rejects an invalid calendar date', async () => {
+  const value = await parseSpecExample('10.3-greenfield-rule.yaml');
+  value.specified.verification.last_verified_at = '2026-02-30';
+  expectInvalidAt('invalid last_verified_at', 'business-rule', value,
+    '/specified/verification/last_verified_at');
+});
+
+for (const file of ['16.3-source-code-evidence.yaml', '16.6-sme-evidence.yaml']) {
+  test(`§§16.3, 16.6 observed.at rejects malformed date in ${file}`, async () => {
+    const value = await parseSpecExample(file);
+    value.observed.at = '2026-10-14T25:12:00Z';
+    expectInvalidAt('malformed observed.at', 'evidence', value, '/observed/at');
+  });
+}
+
+for (const [name, value] of [
+  ['executes', ['BR-0001']], ['reads', ['DE-0001']], ['writes', ['DE-0001']],
+  ['produces', ['OUT-0001']], ['calls', ['INT-0001']], ['triggered_by', ['EVT-0001']],
+  ['performed_by', ['ACT-0001']], ['transitions', ['ST-0001']],
+  ['part_of', 'CAP-0002'], ['steps', [{ id: 's9', name: 'Other', executes: ['BR-0009'] }]],
+  ['version', 3], ['epistemic', { computed_confidence: 'confirmed' }],
+  ['verification', { state: 'fresh' }], ['scope', { business_unit: ['B'] }],
+  ['validity', { effective_from: '2026-10-01' }],
+  ['authority', { type: 'human', role: 'editor' }],
+  ['logic', { kind: 'narrative', unstructured_reason: 'Other' }],
+]) {
+  nestedNegative(`§§7.1–7.2, 10.5 BP identity cannot own ${name}`,
+    'business-process', bp, x => { x.identity = { [name]: value }; }, '/identity', name);
+}
+
+for (const [name, value] of [
+  ['contains', ['DE-0021']], ['fields', { shadow: { type: 'string' } }],
+  ['persistence', { kind: 'relational', table: 'shadow' }],
+  ['version', 3], ['epistemic', { computed_confidence: 'confirmed' }],
+  ['verification', { state: 'fresh' }], ['scope', { business_unit: ['B'] }],
+  ['validity', { effective_from: '2026-10-01' }],
+  ['authority', { type: 'human', role: 'editor' }],
+]) {
+  nestedNegative(`§§7.1–7.2, 10.5 DE identity cannot own ${name}`,
+    'data-entity', de, x => { x.identity = { [name]: value }; }, '/identity', name);
+}
+
+for (const [schema, base] of [['capability', cap], ['outcome', out]]) {
+  for (const [name, value] of [
+    ['computed_confidence', 'confirmed'], ['effective_confidence', 'confirmed'],
+    ['epistemic', { computed_confidence: 'confirmed' }], ['version', 4],
+    ['verification', { state: 'fresh' }],
+    ['steps', [{ id: 's1', executes: ['BR-0001'] }]],
+    ['fields', { concentration: { type: 'quantity' } }],
+    ['identity', { executes: ['BR-0001'] }],
+    ['relationships', { contains: ['BP-0001'] }],
+    ['meta', { created_at: '2026-10-01', updated_at: '2026-10-02' }],
+    ['totally_bogus_field', true],
+  ]) {
+    nestedNegative(`§§10.5, 10.8, 19.1 ${schema} cannot carry ${name}`,
+      schema, base, x => { x[name] = value; }, '', name);
+  }
+}
+
+for (const [location, property, mutate] of [
+  ['/disposition', 'statement', x => { x.disposition.statement = 'duplicate'; }],
+  ['/disposition/resolution', 'statement', x => {
+    x.disposition.resolution = { kind: 'change', ref: 'CHG-0001', statement: 'duplicate' };
+  }],
+  ['/disposition/owner', 'statement', x => {
+    x.disposition.owner = { type: 'human', role: 'product-owner', statement: 'duplicate' };
+  }],
+  ['/detected/proof', 'statement', x => { x.detected.proof.statement = 'duplicate'; }],
+  ['/disposition', 'created_at', x => { x.disposition.created_at = '2026-10-01'; }],
+  ['/disposition', 'updated_at', x => { x.disposition.updated_at = '2026-10-01'; }],
+  ['/detected', 'created_at', x => { x.detected.created_at = '2026-10-01'; }],
+  ['/detected/proof', 'updated_at', x => { x.detected.proof.updated_at = '2026-10-01'; }],
+  ['/disposition/resolution', 'updated_at', x => {
+    x.disposition.resolution = { kind: 'change', ref: 'CHG-0001', updated_at: '2026-10-01' };
+  }],
+  ['/disposition/owner', 'created_at', x => {
+    x.disposition.owner = { type: 'human', role: 'product-owner', created_at: '2026-10-01' };
+  }],
+]) {
+  test(`§§23.3, 19.1 DIV ${location} rejects ${property}`, () => {
+    const value = specDiv();
+    mutate(value);
+    expectInvalidAt(`${location}.${property}`, 'divergence', value, location, property);
+  });
+}
+
+for (const proof of [{}, { mechanism: 'path-diff' },
+  { mechanism: 'scenario-differential' },
+  { mechanism: 'scenario-differential', failing_scenarios: [] }]) {
+  test(`§23.1 behavioral DIV requires a failing scenario: ${JSON.stringify(proof)}`, () => {
+    const value = specDiv();
+    value.detected.classification = 'behavioral-divergence';
+    value.detected.proof = proof;
+    expectInvalidAt('unproven behavioral DIV', 'divergence', value, '/detected');
+  });
+}
 
 negative('§42.1 wrong schema_version', 'business-rule', br, x => { x.schema_version = 2.0; }, '/schema_version');
 negative('§4.3 DEC is not a core type', 'business-rule', br, x => { x.type = 'decision'; }, '/type');

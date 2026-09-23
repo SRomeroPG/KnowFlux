@@ -27,7 +27,7 @@
       "hint_lines": { "type": "object", "properties": { "start": { "type": "integer", "minimum": 1 }, "end": { "type": "integer", "minimum": 1 } }, "additionalProperties": false }
     }, "additionalProperties": true },
     "observed": { "type": "object", "properties": {
-      "commit": { "type": "string" }, "branch": { "type": "string" }, "at": { "type": "string", "format": "date-time" }
+      "commit": { "type": "string" }, "branch": { "type": "string" }, "at": { "type": "string", "anyOf": [ { "format": "date" }, { "format": "date-time" } ] }
     }, "additionalProperties": true },
     "source": { "type": "object" },
     "revalidate_after": { "type": "string" },

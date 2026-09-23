@@ -1,0 +1,22 @@
+schema_version: 2.1
+id: EV-0038
+type: source-code
+assertion_kind: fact
+
+anchor:
+  resolver: source-code
+  repository: legacy-app
+  path: src/main/java/com/acme/CalculationService.java
+  symbol: "CalculationService#calculate(FormulationInput)"
+  symbol_kind: method
+  content_sha: 9f3a1c4e...
+  hint_lines: {start: 430, end: 478}       # DERIVADO
+
+observed:
+  commit: abc123def
+  branch: main
+  at: 2026-10-14T09:12:00Z
+
+supports: [BR-0037#observed:legacy-app]     # faceta, no entidad
+excerpt: |
+  if (input.getConcentration() > MAX_CONCENTRATION) { ... }

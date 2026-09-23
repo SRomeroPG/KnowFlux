@@ -72,7 +72,7 @@
       "properties": {
         "mode": { "enum": ["attested", "external-test"] },
         "state": { "enum": ["fresh", "stale", "broken", "unverifiable", "needs-revalidation"] },
-        "last_verified_at": { "type": "string", "format": "date-time" },
+        "last_verified_at": { "type": "string", "anyOf": [ { "format": "date" }, { "format": "date-time" } ] },
         "verified_against": { "type": "object" },
         "attested_by": { "$ref": "#/$defs/authority" },
         "external_test": { "type": "object" }

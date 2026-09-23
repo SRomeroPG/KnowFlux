@@ -11,7 +11,7 @@
     "id": { "$ref": "common.schema.json#/$defs/bpId" },
     "type": { "const": "business-process" },
     "part_of": { "$ref": "common.schema.json#/$defs/capId" },
-    "identity": { "type": "object", "allOf": [ { "$ref": "common.schema.json#/$defs/authoredRootNames" } ], "additionalProperties": true },
+    "identity": { "type": "object", "additionalProperties": false },
     "specified": {
       "oneOf": [
         { "$ref": "business-process-specified.schema.json" },

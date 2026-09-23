@@ -2,10 +2,32 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://knowflux.dev/schemas/divergence.schema.json",
   "type": "object",
-  "allOf": [ { "$ref": "common.schema.json#/$defs/entityBase" }, { "$ref": "common.schema.json#/$defs/authoredRootNames" } ],
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/entityBase" },
+    { "$ref": "common.schema.json#/$defs/authoredRootNames" },
+    { "$ref": "#/$defs/noDuplicatedStatementOrGitTime" }
+  ],
+  "$defs": {
+    "noDuplicatedStatementOrGitTime": {
+      "if": { "type": "object" },
+      "then": {
+        "type": "object",
+        "propertyNames": { "not": { "enum": ["statement", "created_at", "updated_at"] } },
+        "additionalProperties": { "$ref": "#/$defs/noDuplicatedStatementOrGitTime" }
+      },
+      "else": {
+        "if": { "type": "array" },
+        "then": { "type": "array", "items": { "$ref": "#/$defs/noDuplicatedStatementOrGitTime" } }
+      }
+    }
+  },
   "required": ["id", "detected", "disposition"],
   "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
     "id": { "type": "string", "pattern": "^DIV-[0-9]{4,}$" },
+    "id_status": { "$ref": "common.schema.json#/$defs/idStatus" },
+    "name": { "type": "string" },
+    "lifecycle": { "$ref": "common.schema.json#/$defs/lifecycle" },
     "type": { "const": "divergence" },
     "detected": {
       "type": "object",
@@ -16,7 +38,7 @@
         "comparison": { "type": "object", "required": ["specified", "observed"], "properties": {
           "specified": { "$ref": "common.schema.json#/$defs/specifiedAddress" },
           "observed": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#observed:[^\\s#]+$" }
-        }, "additionalProperties": false },
+        }, "additionalProperties": true },
         "difference": { "type": "object", "required": ["path"], "properties": {
           "path": { "type": "string" }, "specified": {}, "observed": {}
         }, "additionalProperties": false },
@@ -24,12 +46,20 @@
         "proof": { "type": "object", "properties": {
           "mechanism": { "enum": ["scenario-differential", "path-diff"] },
           "failing_scenarios": { "type": "array", "items": { "type": "string", "pattern": "^SC-[0-9]{4,}$" } }
-        }, "additionalProperties": true },
+        }, "additionalProperties": false },
         "first_detected": { "type": "string", "format": "date" },
         "last_confirmed": { "type": "string", "format": "date" },
         "state": { "enum": ["present", "absent", "superseded"] }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "if": { "properties": { "classification": { "const": "behavioral-divergence" } }, "required": ["classification"] },
+      "then": { "properties": { "proof": {
+        "type": "object", "required": ["mechanism", "failing_scenarios"],
+        "properties": {
+          "mechanism": { "const": "scenario-differential" },
+          "failing_scenarios": { "type": "array", "minItems": 1 }
+        }
+      } } }
     },
     "disposition": { "type": "object", "properties": {
       "status": { "enum": ["open", "accepted", "resolving", "resolved"] },
@@ -42,6 +72,6 @@
       }, "additionalProperties": true }
     }, "additionalProperties": true }
   },
-  "propertyNames": { "not": { "enum": ["specified", "observed", "facet", "statement"] } },
-  "unevaluatedProperties": false
+  "propertyNames": { "not": { "enum": ["specified", "observed", "facet"] } },
+  "additionalProperties": false
 }

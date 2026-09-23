@@ -1,0 +1,9 @@
+schema_version: 2.1
+id: EV-0141
+type: sme-validation
+assertion_kind: fact
+source: {role: formulation-scientist}
+observed: {at: 2026-10-14}
+revalidate_after: P6M
+supports: [BR-0037#specified]
+statement: "Máximo 4.2 % m/m en BU-A; materiales tipo X exentos."

@@ -1,0 +1,41 @@
+schema_version: 2.1
+id: BR-0037
+type: business-rule
+name: Maximum Concentration Validation
+
+identity:
+  rule_kind: invariant
+  subject: formulation concentration
+  determination: whether a formulation is within the permitted limit
+  governs: [DE-0017.concentration]
+  produces: [OUT-0004, OUT-0009]
+  signature: {algorithm: kf-normalize-v1, value: 9f3a1c...}
+
+lifecycle: {status: active}
+
+specified:                          # mapping = azúcar para lista de un elemento
+  version: 3
+  scope: {business_unit: [A, B], jurisdiction: [EU]}
+  validity: {effective_from: 2026-10-01, effective_until: null}
+  authority: {type: human, role: regulatory-officer, ref: "acta RC-2027-02"}
+  logic:
+    kind: decision-table
+    hit_policy: first
+    exhaustive: true
+    inputs:
+      - {ref: DE-0017.concentration, type: quantity, unit: percent_mass}
+      - {ref: DE-0017.material_type, type: enum, domain: [X, Y, Z]}
+    rules:
+      - id: r1
+        when: {material_type: {not_in: [X]}}
+        then: {max_concentration: {value: "4.2", unit: percent_mass}, outcome: OUT-0004}
+      - id: r2
+        when: {material_type: X}
+        then: {exempt: true, outcome: OUT-0009}
+  epistemic:
+    computed_confidence: confirmed
+    override: null
+    contested: false
+  verification:
+    last_verified_at: 2026-10-14
+    verified_against: {knowledge: 2027.02.1}
