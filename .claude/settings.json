@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Edit(**/knowledge-framework-spec-v2.1.md)",
+      "Edit(**/.codex/**)",
+      "Edit(**/AGENTS.md)",
+      "Edit(**/.strike-team/AI_STRIKE_TEAM_BOOTSTRAP.md)"
+    ]
+  }
+}
