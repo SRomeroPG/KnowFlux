@@ -38,5 +38,5 @@ Portal, chatbot, Graph DB and webhooks from §53 G require separate future autho
 
 | Phase | Status | Plan | Traceability | Codex handoff | Claude verdict |
 |---|---|---|---|---|---|
-| P001 | CODEX_READY_FOR_AUDIT | [PLAN](phases/P001-core-persistent-model/PLAN.md) | [TRACEABILITY](phases/P001-core-persistent-model/TRACEABILITY.md) | [CODEX_HANDOFF](phases/P001-core-persistent-model/CODEX_HANDOFF.md) | Pending |
+| P001 | CHANGES_REQUESTED | [PLAN](phases/P001-core-persistent-model/PLAN.md) | [TRACEABILITY](phases/P001-core-persistent-model/TRACEABILITY.md) | [CODEX_HANDOFF](phases/P001-core-persistent-model/CODEX_HANDOFF.md) | [R01: CHANGES_REQUESTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R01.md) |
 | P002–P027 | Proposed; not authorized | Created when authorized | — | — | — |
