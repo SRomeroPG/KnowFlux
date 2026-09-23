@@ -38,7 +38,7 @@
         "comparison": { "type": "object", "required": ["specified", "observed"], "properties": {
           "specified": { "$ref": "common.schema.json#/$defs/specifiedAddress" },
           "observed": { "type": "string", "pattern": "^(BP|BR|DE)-[0-9]{4,}#observed:[^\\s#]+$" }
-        }, "additionalProperties": true },
+        }, "additionalProperties": false },
         "difference": { "type": "object", "required": ["path"], "properties": {
           "path": { "type": "string" }, "specified": {}, "observed": {}
         }, "additionalProperties": false },

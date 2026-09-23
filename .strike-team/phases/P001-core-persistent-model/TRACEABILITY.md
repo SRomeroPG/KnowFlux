@@ -38,6 +38,7 @@
 | T29 §23.3 | DIV SHALL NOT duplicate claims via `statement`; its persistent `detected` and `disposition` sections are distinct. | DIV schema | §23.3 in-memory DIV positive; root and nested `statement` negatives in `proof`, `disposition`, `owner`, and `resolution` | PASS |
 | T29a §23.3 | Engine SHALL rewrite only `detected` and preserve human `disposition`. | DIV section shape; P017 derivation | preservation/rebuild tests in P017 | DEFERRED |
 | T29b §23.1 | `behavioral-divergence` SHALL require scenario-differential proof and at least one failing scenario. | DIV `detected` conditional schema | §23.3 in-memory positive; missing/wrong mechanism and empty scenario negatives | PASS |
+| T29c §§23.2–23.3 | A DIV comparison identifies one specified facet and one observed target, with no additional comparison content. | DIV `detected.comparison` schema | §23.3 in-memory positive; nested extra observed-reference and free-text-key negatives with property-specific diagnostics | PASS |
 | T30 §26 | Observed `SC.asserts` SHALL have target; scenario addresses correct facet class. | SC schema | observed-target negative; both-class positives | PASS |
 | T31 §§54–55 | KB SHALL remain readable as text; no database/server/cloud required; fixture SHALL evolve with each feature; DIV SHALL NOT be manually populated. | YAML conformance slice; local test scripts | clean checkout tests; fixture inspection; no DIV file | PASS |
 

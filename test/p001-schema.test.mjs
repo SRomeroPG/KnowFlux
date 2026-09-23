@@ -189,6 +189,19 @@ test('§23.3: schema recognizes an engine-derived DIV without duplicate statemen
   assert.ok(hasExpectedDiagnostic(duplicate.diagnostics, '@statement'), JSON.stringify(duplicate.diagnostics));
 });
 
+for (const [property, value] of [
+  ['observed_backend', 'BR-0001#observed:backend'],
+  ['note', 'free text claim'],
+]) {
+  test(`§§23.2–23.3 DIV comparison rejects extra ${property}`, () => {
+    const derived = specDiv();
+    assert.equal(validate('divergence', derived).valid, true);
+    derived.detected.comparison[property] = value;
+    expectInvalidAt(`extra comparison ${property}`, 'divergence', derived,
+      '/detected/comparison', property);
+  });
+}
+
 for (const [section, file, schema, observedAt] of [
   ['§10.3', '10.3-greenfield-rule.yaml', 'business-rule', null],
   ['§16.3', '16.3-source-code-evidence.yaml', 'evidence', '2026-10-14T09:12:00Z'],
