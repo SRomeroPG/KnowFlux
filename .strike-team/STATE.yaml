@@ -7,7 +7,7 @@ spec_status: frozen
 current_phase:
   id: P001
   name: Repository Foundation + Core Persistent Model
-  status: CODEX_IMPLEMENTING
+  status: CODEX_READY_FOR_AUDIT
   audit_round: 0
 
 status_values:
@@ -21,7 +21,7 @@ status_values:
   - ACCEPTED
   - BLOCKED_BY_SPEC_GAP
 
-last_codex_commit: null
+last_codex_commit: 3ef4d86c5e37623e4e22bcadf8550d0ca66d6fc9
 last_claude_audit: null
 open_required_findings: 0
 open_spec_gaps: [SG-0001]
