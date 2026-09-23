@@ -1,0 +1,13 @@
+# Independently stated §55 P002 expectations for unaffected allocation behavior.
+# The operational registry is engine-created in tests.
+schema_version: 2.1
+cases:
+  - name: first_business_rule
+    prefix: BR
+    expected: {id: BR-0001, id_status: provisional}
+  - name: second_business_rule
+    prefix: BR
+    expected: {id: BR-0002, id_status: provisional}
+  - name: first_data_entity
+    prefix: DE
+    expected: {id: DE-0001, id_status: provisional}

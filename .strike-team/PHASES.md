@@ -1,6 +1,6 @@
 # KnowFlux roadmap through Milestone 1
 
-Core Specification v2.1 §53 fixes the dependency order. Each P phase is independently auditable. Only P001 is authorized. Later boundaries may be refined after an accepted phase, without moving a §53 item ahead of its prerequisites. `Pxxx accepted` means the independent Claude gate has passed.
+Core Specification v2.1 §53 fixes the dependency order. Each P phase is independently auditable. P001 is accepted; P002 was authorized and is blocked by spec gaps. Later boundaries may be refined after an accepted phase, without moving a §53 item ahead of its prerequisites. `Pxxx accepted` means the independent Claude gate has passed.
 
 | Phase and §53 item | Primary clauses | Dependencies | Deliverable; verification/conformance | Risk; expected Codex specialists | Claude focus; boundary reason |
 |---|---|---|---|---|---|
@@ -39,4 +39,5 @@ Portal, chatbot, Graph DB and webhooks from §53 G require separate future autho
 | Phase | Status | Plan | Traceability | Codex handoff | Claude verdict |
 |---|---|---|---|---|---|
 | P001 | ACCEPTED | [PLAN](phases/P001-core-persistent-model/PLAN.md) | [TRACEABILITY](phases/P001-core-persistent-model/TRACEABILITY.md) | [CODEX_HANDOFF](phases/P001-core-persistent-model/CODEX_HANDOFF.md); [REMEDIATION_R01](phases/P001-core-persistent-model/remediation/CODEX_REMEDIATION_R01.md); [REMEDIATION_R02](phases/P001-core-persistent-model/remediation/CODEX_REMEDIATION_R02.md) | [R01: CHANGES_REQUESTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R01.md); [R02: CHANGES_REQUESTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R02.md); **[R03: ACCEPTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md)** |
-| P002–P027 | Proposed; not authorized | Created when authorized | — | — | — |
+| P002 | BLOCKED_BY_SPEC_GAP | [PLAN](phases/P002-id-registry/PLAN.md) | [TRACEABILITY](phases/P002-id-registry/TRACEABILITY.md) | [BLOCKED_HANDOFF](phases/P002-id-registry/BLOCKED_HANDOFF.md) | Pending; no Claude audit requested |
+| P003–P027 | Proposed; not authorized | Created when authorized | — | — | — |
