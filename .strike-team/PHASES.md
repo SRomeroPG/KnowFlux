@@ -9,7 +9,7 @@ Tracks: Track A is format/backbone (P002, P028, P003 onward). Track B is pure lo
 | Phase and §53 item | Primary clauses | Depends on | Track | Deliverable; verification | Risk | Status |
 |---|---|---|---|---|---|---|
 | [P001 Repository Foundation + Core Persistent Model](phases/P001-core-persistent-model/PLAN.md); A1 | §§4, 6.1, 7, 9–10, 14–16.3, 18.1–18.2, 20–23, 26, 42.1, 54–55 | — | A | 11 schemas, separate facet classes, partial text fixture, positive/negative schema tests | HIGH | ACCEPTED |
-| [P002 ID Registry](phases/P002-id-registry/PLAN.md); A2 | §§8, 10.7; E-0001..E-0004, E-0007 | P001 | A | Allocation, provisional/permanent states, aliases, stale-lock recovery; branch/collision/cross-process cases | HIGH | PLANNED |
+| [P002 ID Registry](phases/P002-id-registry/PLAN.md); A2 | §§8, 10.7; E-0001..E-0004, E-0007, E-0008(a), E-0009..E-0015 | P001 | A | Engine API only (E-0014): allocation, provisional/permanent states, canonical promotion, renumbering with aliases, stale-lock recovery; branch/collision/cross-process cases | HIGH | IMPLEMENTING |
 | P003 Evidence Resolver Contract; A3a | §§3.2, 16.3–16.4 | P001 | A | Generic interface and fingerprint harness; resolver contract tests | HIGH | PLANNED |
 | P004 Source Code Resolver; A3b | §§16.3–16.5 | P003 | A | One language adapter; rename, move, stale/broken fixture | HIGH | PLANNED |
 | P005 Database Schema Resolver; A3c | §§10.5, 16.4–16.5 | P003 | A | Canonical database fingerprint and observed DE extraction; order/type drift tests | HIGH | PLANNED |
@@ -44,6 +44,6 @@ Portal, chatbot, Graph DB and webhooks from §53 G require separate future autho
 | Phase | Status | Plan | Traceability | Handoff | Audit verdict |
 |---|---|---|---|---|---|
 | P001 | ACCEPTED | [PLAN](phases/P001-core-persistent-model/PLAN.md) | [TRACEABILITY](phases/P001-core-persistent-model/TRACEABILITY.md) | [HANDOFF](phases/P001-core-persistent-model/HANDOFF.md); [REMEDIATION_R01](phases/P001-core-persistent-model/remediation/REMEDIATION_R01.md); [REMEDIATION_R02](phases/P001-core-persistent-model/remediation/REMEDIATION_R02.md) | [R01: CHANGES_REQUESTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R01.md); [R02: CHANGES_REQUESTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R02.md); **[R03: ACCEPTED](phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md)** |
-| P002 | PLANNED | [PLAN](phases/P002-id-registry/PLAN.md) | [TRACEABILITY](phases/P002-id-registry/TRACEABILITY.md) | [BLOCKED_HANDOFF](phases/P002-id-registry/BLOCKED_HANDOFF.md) (history; blockers decided by E-0001..E-0004, E-0007) | Pending; no audit requested |
+| P002 | IMPLEMENTING | [PLAN](phases/P002-id-registry/PLAN.md); [TRIAGE](phases/P002-id-registry/TRIAGE.md) | [TRACEABILITY](phases/P002-id-registry/TRACEABILITY.md) | [BLOCKED_HANDOFF](phases/P002-id-registry/BLOCKED_HANDOFF.md) (history; blockers decided by E-0001..E-0004, E-0007) | Pending; no audit requested |
 | P003–P027 | PLANNED | Created when the Foreman opens the phase | — | — | — |
 | P028 | PLANNED | [PLAN](phases/P028-cli-backbone/PLAN.md) | Created when the Foreman opens the phase | — | — |
