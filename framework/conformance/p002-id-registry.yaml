@@ -14,7 +14,7 @@
 # framework/conformance/p002-id-registry/, never copied from engine output.
 schema_version: 2.1
 phase: P002
-status: pending-implementation
+status: enforced
 
 # Every key of case_index has at least one test whose title starts with the key (checked by the runner).
 # cites = spec line / errata entry / PLAN target the expectation is derived from.
@@ -208,18 +208,3 @@ tables:
       - [data-entity, knowledge/data/DE-0001/entity.yaml]
       - [evidence, knowledge/evidence/EV-0001/evidence.yaml]
       - [scenario, knowledge/scenarios/SC-0001/scenario.yaml]
-
-# Legacy checkpoint block (commit 0dddf47), kept verbatim and in its original array shape because the
-# checkpoint unit test test/p002-id-registry.test.mjs (implementer-owned; PLAN step 3.4 retires or updates it)
-# still reads it. It is not part of this slice: the slice is case_index/tables above. Every statement is still
-# true under the new contract (spec l.300 format, E-0012 per-prefix counter, provisional status l.308/l.315).
-cases:
-  - name: first_business_rule
-    prefix: BR
-    expected: {id: BR-0001, id_status: provisional}
-  - name: second_business_rule
-    prefix: BR
-    expected: {id: BR-0002, id_status: provisional}
-  - name: first_data_entity
-    prefix: DE
-    expected: {id: DE-0001, id_status: provisional}

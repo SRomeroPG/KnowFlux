@@ -148,6 +148,7 @@
         "schema_version": { "$ref": "#/$defs/schemaVersion" },
         "id": { "$ref": "#/$defs/entityId" },
         "id_status": { "$ref": "#/$defs/idStatus" },
+        "id_alias": { "type": "array", "items": { "$ref": "#/$defs/entityId" }, "uniqueItems": true },
         "name": { "type": "string" },
         "lifecycle": { "$ref": "#/$defs/lifecycle" }
       }

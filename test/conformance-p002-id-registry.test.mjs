@@ -28,7 +28,7 @@ import {
   makeBase, noopHistory, promote,
 } from '../framework/conformance/p002-id-registry/scenarios.mjs';
 
-const PENDING = 'P002 implementation pending'; // set to false to enforce the whole slice
+const PENDING = false; // slice enforced (was 'P002 implementation pending')
 
 const dataFile = path.join(REPO_ROOT, 'framework', 'conformance', 'p002-id-registry.yaml');
 const data = YAML.parse(await fs.readFile(dataFile, 'utf8'));

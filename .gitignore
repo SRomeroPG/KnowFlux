@@ -186,3 +186,4 @@ coverage/
 
 # E-0007: registry lock directories are never committed
 .kf/*.lock/
+.kf/id-registry.yaml.*.tmp
