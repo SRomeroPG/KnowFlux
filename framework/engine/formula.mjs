@@ -206,13 +206,14 @@ function prepare(logic, options) {
   const guards = [];
   if (Object.hasOwn(logic, 'guards')) {
     if (!Array.isArray(logic.guards)) throw invalid('guards must be a list', '/guards');
-    logic.guards.forEach((guard, index) => {
+    for (let index = 0; index < logic.guards.length; index += 1) {
+      const guard = logic.guards[index];
       const at = ptr('/guards', index);
       if (!isRecord(guard) || !hasKeys(guard, ['when', 'raise'])) throw invalid('a guard is exactly {when, raise}', at);
       if (!isOutcomeId(guard.raise)) throw invalid('raise must match ^OUT-[0-9]{4,}$', ptr(at, 'raise'));
       const when = compilePredicateOf(st, guard.when, ptr(at, 'when'));
       guards.push({ node: when.node, mentions: when.mentions, raise: guard.raise });
-    });
+    }
   }
   const outputUnit = registry.units.find((unit) => unit.id === output.unit);
   return { registry, inputs, bind, precision, output: { ref: output.ref, unit: output.unit, dimension: outputUnit.dimension }, rounding, root, guards, findings: st.findings };

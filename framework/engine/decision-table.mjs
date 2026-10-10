@@ -846,7 +846,9 @@ export function compileLogicInputs(rawInputs, registry) {
   const seen = new Set();
   let inputs;
   try {
-    inputs = rawInputs.map((raw, index) => declareInput(raw, index, registry, seen));
+    inputs = [];
+    // an index loop, not .map: .map skips the holes of a sparse list, which are malformed declarations (D01)
+    for (let index = 0; index < rawInputs.length; index += 1) inputs.push(declareInput(rawInputs[index], index, registry, seen));
   } catch (error) {
     throw retarget(error, 'INVALID_ARGUMENT');
   }
@@ -869,11 +871,34 @@ function predicateInputs(node, found) {
 }
 
 /**
+ * Reject the holes of sparse all/any lists before compiling (AUDIT_R01 D01): `list.map` in `compilePredicate` skips holes,
+ * which would leave `undefined` children in the compiled node. A hole is a malformed predicate (errata E-0033). The walk is
+ * bounded by MAX_DEPTH; deeper input is left to `compilePredicate`, which reports it.
+ */
+function assertDensePredicate(predicate, pointer, depth) {
+  if (depth > MAX_DEPTH || !isRecord(predicate)) return;
+  for (const key of Object.keys(predicate)) {
+    const here = ptr(pointer, key);
+    if (key === 'all' || key === 'any') {
+      const list = predicate[key];
+      if (!Array.isArray(list)) continue;
+      for (let i = 0; i < list.length; i += 1) {
+        if (!Object.hasOwn(list, i)) throw err('INVALID_EXPRESSION', 'a predicate list must not have holes', { at: ptr(here, String(i)) });
+        assertDensePredicate(list[i], ptr(here, String(i)), depth + 1);
+      }
+    } else if (key === 'not') {
+      assertDensePredicate(predicate[key], here, depth + 1);
+    }
+  }
+}
+
+/**
  * Compile one predicate of a formula (a guard `when`, an `if` `cond`) at JSON pointer `pointer`. An empty mapping
  * is EMPTY_PREDICATE. Returns the opaque node, the sorted-by-the-caller findings (`KF-E-310/314/315`, literal
  * source) and `mentions`: the ascending input indexes the predicate reads.
  */
 export function compileLogicPredicate(predicate, context, pointer) {
+  assertDensePredicate(predicate, pointer, 0);
   const findings = [];
   const ctx = { inputs: context.inputs, bind: context.bind, registry: context.registry, findings, rule: { id: null, index: null } };
   let node;
