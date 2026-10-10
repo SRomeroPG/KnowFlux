@@ -100,3 +100,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 
 - P012: kf-spec-triage 16 items -> E-0030..E-0033 (T-15 deferred to P007). kf-phase-planner: PLAN (38 targets), TRIAGE, TRACEABILITY; D-01..D-03 -> E-0036; P-02 accepted (additive-only P011 extension). Planner caught citation slips in E-0030/E-0031 (l.590->591, l.658->660, l.644->641); corrected.
 - P002: R02 remediation cases written (12 red); E-0035 decided (later promote at anchor invalid; optional headCommit; entities_skipped). Implementer running.
+
+## 2026-10-10 P002 remediate R02 -> hand off R03
+
+- Fresh kf-conformance-engineer: 12 new/changed cases (F-D4 restated under E-0029), 12 red before the fix; E-0035 decided.
+- Fresh kf-implementer (remediation): F01-F04 fixed; 14 unit tests in test/p002-r02.test.mjs. Product commit 424a2bf.
+- Foreman verification: P002 tests + conformance 189/189; lint clean on P002 paths; auditor probes rerun: p1 (feature checkout) -> skipped not_canonical_tip; p2b -> GIT_FAILED; p6 -> concurrent edit preserved.
+- R03 plan (last round before STALLED): fresh spec-compliance + integration-regression + test-conformance auditors.

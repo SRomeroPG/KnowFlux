@@ -28,11 +28,11 @@ phases:
     audit_round: 3
     accepted_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
   P002:
-    status: CHANGES_REQUESTED
+    status: REAUDITING
     track: A
     depends_on: [P001]
     plan: .strike-team/phases/P002-id-registry/PLAN.md
-    last_product_commit: 08b3910297e910fe64c1a15b01ff48c2fbe514e6
+    last_product_commit: 424a2bf8b13b9e79ed6c57c4dbff47b48f0f3b42
     audit_round: 2
     accepted_audit: null
   P003:

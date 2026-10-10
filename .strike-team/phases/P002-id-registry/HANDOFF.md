@@ -1,5 +1,7 @@
 # P002 ID Registry - HANDOFF (round R01, `kf-implementer`)
 
+> **Round R02 remediation (after audit R02):** F01-F04 are fixed and F05 has a unit test; see `remediation/REMEDIATION_R02.md`. Result shape change: `promoteIds` always returns `entities_skipped: string[]` (E-0035 (3)) and, on a checkout that is not the canonical tip, `skipped: 'not_canonical_tip'` (E-0029). The history reader interface gained the optional `headCommit()` (E-0035 (2)). Current state: 98 conformance tests, 189 P002 tests in total, `npm test` 614/614. Statements below about promotion from a non-tip checkout (the F-D4 reading) are superseded by E-0029.
+
 > **Round R01 remediation (after audit R01):** this file describes the first implementation round; the counts and test totals below are those of that round. The remediation changes (F01-F10, E-0024, E-0028) and their verification are in `remediation/REMEDIATION_R01.md`. Current state: 85 conformance tests and 162 P002 tests pass, `npm test` 585/585. DN-1 and DN-2 below were decided by E-0023 (1a) and (2a); E-0013's break wording stays as described in "Deviations" item 1 (E-0023 (3b)).
 
 Base commit when the work started: `5fce77d` (conformance slice committed). The implementer never edited `framework/conformance/**`, `test/conformance*`, the spec, the errata or any control-plane file other than this file and `TRACEABILITY.md`. The Foreman commits; the product SHA is to be recorded after the commit.
