@@ -4,6 +4,8 @@ Recorded 2026-09-22. This record contains only capabilities observed in the acti
 
 ## Codex
 
+> RETIRED: Codex is no longer part of the team (Claude Strike Team v2). This section is kept as historical record only.
+
 Runtime/extension: Codex CLI v0.155.0-alpha.16, Windows x86_64; Desktop app build 26.917.6896.0 is installed.
 
 Agent mechanism: Built-in collaboration agents, created dynamically with bounded tasks. Project-scoped native custom-agent definitions are supported in `.codex/agents/*.toml`, with global defaults in `.codex/config.toml`.
@@ -59,3 +61,7 @@ Audit write restrictions:
 Smoke test (2026-09-23): Because custom types were not yet loaded, the smoke test used `general-purpose` subagents. Each read its role file and had the role's model tier applied through a per-call override. The spec-compliance role (sonnet), the test-conformance role (sonnet), and the mechanical worker role (haiku) all spawned, quoted their role instructions, and inspected the repository and spec. Their results matched independent ground truth: 66 `##` sections, 125 SHALL lines, 61 SHALL NOT lines, and conformance defined in §55 (lines 2075–2081). `git status --short` was unchanged before and after each run, and no product files were modified. This fallback did not test native tool restriction, because `general-purpose` has all tools.
 
 Known plan constraints: The user specified an approximately $20/month plan, and no paid add-on capacity is assumed. Opus is reserved for HIGH/CRITICAL work, and search, enumeration, and formatting go to Haiku.
+
+### Foreman runtime
+
+The Foreman runs as the root Claude Code session via the `/knowflux-foreman` skill. It needs permissions pre-approved so unattended runs do not stall on prompts (see `.claude/settings.json`). Long runs are resumable: a new session reads `.strike-team/STATE.yaml` and continues from the recorded phase statuses and the `foreman:` block.

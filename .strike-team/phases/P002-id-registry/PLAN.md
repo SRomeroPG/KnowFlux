@@ -8,7 +8,7 @@ Implement §53 A2 after the independently accepted P001. The user invoked `NEXT_
 
 - P001 R03 audit says `VERDICT: ACCEPTED`, zero required findings, audited handoff commit `48348f2d62a61055f5aa96287b4cce3409f9e8dc` and product remediation commit `c738bd6675bb44c80ef890daf28b335718fbe9c5`.
 - `STATE.yaml` and `PHASES.md` agree that P001 is accepted. Working tree is clean at `6077003` before phase work.
-- SG-0001 and SG-0002 do not affect P002. P001 R03 advisories do not require P002 changes.
+- SG-0001..SG-0005 are resolved or mapped by errata E-0001..E-0005 and E-0007; E-0006 (address grammar) does not affect P002. P001 R03 advisories do not require P002 changes.
 
 ## Normative coverage
 
@@ -27,7 +27,7 @@ Implement §53 A2 after the independently accepted P001. The user invoked `NEXT_
 
 1. A project-local, text-readable registry format and engine allocation/promotion API with deterministic behavior and transactional filesystem locking.
 2. A narrow `kf` CLI surface for P002 allocation and promotion, keeping the normative command name. Only ID semantics are handled; full entity creation and full semantic validation remain later phases.
-3. Collision and alias behavior to the extent the frozen spec defines it. Any irreducible ambiguity becomes a numbered `SPEC_GAP`; stop that workstream rather than choose a persistent contract.
+3. Collision and alias behavior to the extent the frozen spec defines it. Any irreducible ambiguity is reported as `DECISION_NEEDED`; the Foreman decides it in the errata.
 4. Positive, negative, branch, collision, concurrency, non-reuse, and repeat-run tests plus the P002 conformance slice. Maintain `TRACEABILITY.md` as executable evidence develops.
 
 ## Design constraints
@@ -45,7 +45,7 @@ Implement §53 A2 after the independently accepted P001. The user invoked `NEXT_
 2. Implement unaffected allocation and canonical-state behavior behind bounded interfaces; add P002 fixture records and tests together.
 3. Implement only collision/alias behavior determined by the spec or a binding user/spec decision. Keep affected behavior stopped for any open gap.
 4. Run targeted tests, all tests, build/typecheck/lint, deterministic repeat checks, and adversarial review of filesystem races and immutable IDs. Inspect actual diff and working tree.
-5. If complete, commit product and plan/traceability, write `CODEX_HANDOFF.md`, transition to `CODEX_READY_FOR_AUDIT`, commit control-plane handoff, and stop for Claude. If a gap blocks P002 completion, record the gap and set `BLOCKED_BY_SPEC_GAP` without claiming audit readiness.
+5. If complete, commit product and plan/traceability, write `HANDOFF.md`, transition to `READY_FOR_AUDIT`, commit control-plane handoff, and the Foreman audits. If a decision blocks P002 completion, record it and set `BLOCKED_BY_DECISION` without claiming audit readiness.
 
 ## Verification targets
 
@@ -61,8 +61,22 @@ HIGH: this phase establishes permanent identifiers and branch merge semantics. T
 
 ## Exit criteria
 
-All P002 contracts are implemented or a blocking spec gap is recorded. A completed phase requires the conformance slice, traceability, checks, adversarial review, exact product commit, and Codex handoff. Claude alone decides acceptance.
+All P002 contracts are implemented or a blocking spec gap is recorded. A completed phase requires the conformance slice, traceability, checks, adversarial review, exact product commit, and `HANDOFF.md`. The Foreman decides acceptance after an independent audit round.
 
-## Current result
+## Current result (updated 2026-10-09)
 
-P002 is `BLOCKED_BY_SPEC_GAP`. [SG-0003](../../spec-gaps/SG-0003.md) blocks collision renumbering and aliases. [SG-0004](../../spec-gaps/SG-0004.md) blocks safe permanent promotion and lifetime non-reuse across deletion/recreation. [SG-0005](../../spec-gaps/SG-0005.md) blocks automatic identification of the Knowledge Repository's canonical branch. The tested engine module and fixture cover only fresh-project provisional allocation and conservative collision detection. No completed-phase `CODEX_HANDOFF.md` or `CODEX_READY_FOR_AUDIT` claim is warranted.
+P002 is `PLANNED` again. The contracts that blocked it are now decided in `knowledge-framework-spec-v2.1-errata.md`:
+
+- E-0001 (resolves SG-0005): the canonical branch.
+- E-0002 and E-0003 (resolve SG-0003): provisional collision tie-break and alias.
+- E-0004 (resolves SG-0004): continuity; `promote` records the path; `move` event.
+- E-0007: `.kf/id-registry.yaml` is committed with merge=union; the lock file is ignored.
+
+The tested engine module and fixture (`framework/engine/id-registry.mjs`) cover only fresh-project provisional allocation and conservative collision detection. Remaining work:
+
+- Revise the persistent registry contract as needed; implement and test canonical promotion, both collision paths, alias resolution and lifetime non-reuse, `kf create`/`kf validate` integration, the complete P002 fixture slice, and a full adversarial rerun.
+- Stale-lock recovery: lock owner file with pid, host and timestamp, and a stale threshold.
+- `EPERM`/`EBUSY` rename retry on Windows.
+- One cross-process allocation test.
+- Injectable lock deadline.
+- Update traceability to PASS only with executable evidence. Then follow the normal handoff: write `HANDOFF.md`, set `READY_FOR_AUDIT`, and stop for the independent audit. No `HANDOFF.md` or `READY_FOR_AUDIT` claim is warranted yet.

@@ -1,28 +1,259 @@
-schema_version: 1
+schema_version: 2
 
 project: knowflux
 normative_spec: knowledge-framework-spec-v2.1
 spec_status: frozen
-
-current_phase:
-  id: P002
-  name: ID Registry
-  status: BLOCKED_BY_SPEC_GAP
-  audit_round: 0
+errata: knowledge-framework-spec-v2.1-errata.md
+protocol: .strike-team/PROTOCOL_V2.md
 
 status_values:
   - PLANNED
-  - CODEX_IMPLEMENTING
-  - CODEX_READY_FOR_AUDIT
-  - CLAUDE_AUDITING
+  - IMPLEMENTING
+  - READY_FOR_AUDIT
+  - AUDITING
   - CHANGES_REQUESTED
-  - CODEX_REMEDIATING
-  - CLAUDE_REAUDITING
+  - REMEDIATING
+  - REAUDITING
   - ACCEPTED
-  - BLOCKED_BY_SPEC_GAP
+  - BLOCKED_BY_DECISION
+  - STALLED
 
-last_codex_commit: 0dddf47efccff4a97fc643fbcbfebfb3e4c52f6c
+phases:
+  P001:
+    status: ACCEPTED
+    track: A
+    depends_on: []
+    plan: .strike-team/phases/P001-core-persistent-model/PLAN.md
+    last_product_commit: c738bd6675bb44c80ef890daf28b335718fbe9c5
+    audit_round: 3
+    accepted_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
+  P002:
+    status: PLANNED
+    track: A
+    depends_on: [P001]
+    plan: .strike-team/phases/P002-id-registry/PLAN.md
+    last_product_commit: 0dddf47efccff4a97fc643fbcbfebfb3e4c52f6c
+    audit_round: 0
+    accepted_audit: null
+  P003:
+    status: PLANNED
+    track: A
+    depends_on: [P001]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P004:
+    status: PLANNED
+    track: A
+    depends_on: [P003]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P005:
+    status: PLANNED
+    track: A
+    depends_on: [P003]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P006:
+    status: PLANNED
+    track: A
+    depends_on: [P004, P005]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P007:
+    status: PLANNED
+    track: A
+    depends_on: [P002, P006, P028]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P008:
+    status: PLANNED
+    track: A
+    depends_on: [P007]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P009:
+    status: PLANNED
+    track: A
+    depends_on: [P007]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P010:
+    status: PLANNED
+    track: A
+    depends_on: [P009]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P011:
+    status: PLANNED
+    track: B
+    depends_on: [P001]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P012:
+    status: PLANNED
+    track: B
+    depends_on: [P011]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P013:
+    status: PLANNED
+    track: B
+    depends_on: [P012]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P014:
+    status: PLANNED
+    track: A
+    depends_on: [P007, P013]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P015:
+    status: PLANNED
+    track: A
+    depends_on: [P014]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P016:
+    status: PLANNED
+    track: A
+    depends_on: [P007]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P017:
+    status: PLANNED
+    track: A
+    depends_on: [P015, P016]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P018:
+    status: PLANNED
+    track: A
+    depends_on: [P017]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P019:
+    status: PLANNED
+    track: A
+    depends_on: [P016]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P020:
+    status: PLANNED
+    track: A
+    depends_on: [P007]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P021:
+    status: PLANNED
+    track: A
+    depends_on: [P020, P006]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P022:
+    status: PLANNED
+    track: A
+    depends_on: [P020, P018]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P023:
+    status: PLANNED
+    track: A
+    depends_on: [P021]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P024:
+    status: PLANNED
+    track: A
+    depends_on: [P003, P007]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P025:
+    status: PLANNED
+    track: A
+    depends_on: [P024, P019]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P026:
+    status: PLANNED
+    track: A
+    depends_on: [P018, P021]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P027:
+    status: PLANNED
+    track: integration
+    depends_on: [P001, P002, P028, P003, P004, P005, P006, P007, P008, P009, P010, P011, P012, P013, P014, P015, P016, P017, P018, P019, P020, P021, P022, P023, P024, P025, P026]
+    plan: null
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+  P028:
+    status: PLANNED
+    track: A
+    depends_on: [P001]
+    plan: .strike-team/phases/P028-cli-backbone/PLAN.md
+    last_product_commit: null
+    audit_round: 0
+    accepted_audit: null
+
+foreman:
+  active_primary: P002
+  active_secondary: null
+  next_candidates: [P028, P011]
+  last_run: null
+  consecutive_failed_rounds: 0
+
+pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008]
+open_decisions: [E-0006]
+open_spec_gaps: []
+
+# Backward compatibility with schema_version 1 readers.
 last_claude_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
-acceptance_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
-open_required_findings: 0
-open_spec_gaps: [SG-0001, SG-0002, SG-0003, SG-0004, SG-0005]

@@ -1,11 +1,55 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "Agent",
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npm test*)",
+      "Bash(npm ci*)",
+      "Bash(node *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git rev-parse*)",
+      "Bash(git ls-files*)",
+      "Bash(git branch*)",
+      "Bash(git worktree *)",
+      "Bash(git merge *)",
+      "Bash(git symbolic-ref*)",
+      "Bash(git init*)",
+      "Bash(ls*)",
+      "Bash(cat *)",
+      "Bash(sed -n *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(mkdir *)",
+      "Bash(diff *)"
+    ],
     "deny": [
       "Edit(**/knowledge-framework-spec-v2.1.md)",
+      "Write(**/knowledge-framework-spec-v2.1.md)",
       "Edit(**/.codex/**)",
       "Edit(**/AGENTS.md)",
-      "Edit(**/.strike-team/AI_STRIKE_TEAM_BOOTSTRAP.md)"
+      "Edit(**/.strike-team/AI_STRIKE_TEAM_BOOTSTRAP.md)",
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(git rebase*)",
+      "Bash(git clean*)",
+      "Bash(rm -rf *)"
     ]
   }
 }
