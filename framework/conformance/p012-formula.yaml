@@ -17,7 +17,7 @@
 # criterion for KF-E-313; (3) significant digits counted on the normalized coefficient (10^32 / 1 is exact).
 schema_version: 2.1
 phase: P012
-status: pending-implementation
+status: enforced
 base_commit: c10ae95d828847c79589535b1bb31c0fd7153242
 
 # Every key of case_index has at least one test whose title starts with the key, and every test key is indexed

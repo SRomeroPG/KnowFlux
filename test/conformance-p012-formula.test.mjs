@@ -32,7 +32,7 @@ import { payload } from '../framework/conformance/p012-formula/determinism-child
 import { buildOptions, execCase, plain } from '../framework/conformance/p012-formula/exec.mjs';
 import { readSpecExample } from '../framework/conformance/p012-formula/spec-example.mjs';
 
-const PENDING = 'P012 implementation pending';
+const PENDING = false; // enforced: was 'P012 implementation pending' while the engine was being built
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONF = path.join(REPO_ROOT, 'framework', 'conformance');

@@ -40,3 +40,14 @@ export class LogicError extends Error {
 export function logicError(code, message, details = {}) {
   return new LogicError(code, message, details);
 }
+
+/**
+ * Typed error codes added by the formula engine (P012; errata E-0033), ascending byte order. They are exported
+ * separately so that LOGIC_ERROR_CODES keeps exactly the codes pinned by the P011 tests. INVALID_RANGE (already in
+ * LOGIC_ERROR_CODES) is also thrown by formulas (a `clamp` with lo > hi at evaluation).
+ */
+export const FORMULA_ERROR_CODES = Object.freeze([
+  'DIVISION_BY_ZERO',
+  'INEXACT_DIVISION',
+  'INVALID_EXPRESSION',
+]);

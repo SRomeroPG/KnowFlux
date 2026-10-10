@@ -824,3 +824,87 @@ export function evaluateDecisionTable(logic, values, options) {
   const result = evaluateRows(table, typed);
   return { ...result, diagnostics: sortDiagnostics(result.diagnostics) };
 }
+
+// ------------------------------------------------------------------------- formula support (P012; PLAN P-09)
+// Four appended exports that let the formula engine reuse the predicate machinery above without copying it. They
+// wrap the private functions and edit none of them. Inside a formula there are no rules, so predicate findings
+// carry `rule: null`, `rule_index: null`; an INVALID_TABLE raised by the machinery is re-thrown as
+// INVALID_EXPRESSION (`INVALID_ARGUMENT` for the caller-supplied input declarations), because P012 entry points
+// never throw INVALID_TABLE (errata E-0033). The shapes of `inputs` and `node` are opaque to callers.
+function retarget(error, code) {
+  if (error instanceof LogicError && error.code === 'INVALID_TABLE') return err(code, error.message, error.details);
+  return error;
+}
+
+/**
+ * Declare the caller-supplied inputs of a formula (errata E-0031 (1)): same shape and checks as a decision-table
+ * `inputs[]`. Returns the declared inputs and the binder of full refs and ref suffixes (E-0019, E-0027 (2)).
+ */
+export function compileLogicInputs(rawInputs, registry) {
+  if (!Array.isArray(rawInputs)) throw err('INVALID_ARGUMENT', 'inputs must be a list of input declarations', { found: typeName(rawInputs) });
+  if (!isUnitRegistry(registry)) throw err('INVALID_ARGUMENT', 'registry must be a registry built by buildUnitRegistry', {});
+  const seen = new Set();
+  let inputs;
+  try {
+    inputs = rawInputs.map((raw, index) => declareInput(raw, index, registry, seen));
+  } catch (error) {
+    throw retarget(error, 'INVALID_ARGUMENT');
+  }
+  return { inputs, bind: makeBinder(inputs) };
+}
+
+function predicateInputs(node, found) {
+  switch (node.t) {
+    case 'true': return;
+    case 'and':
+    case 'or':
+      for (const item of node.items) predicateInputs(item, found);
+      return;
+    case 'not':
+      predicateInputs(node.item, found);
+      return;
+    default:
+      found.add(node.input);
+  }
+}
+
+/**
+ * Compile one predicate of a formula (a guard `when`, an `if` `cond`) at JSON pointer `pointer`. An empty mapping
+ * is EMPTY_PREDICATE. Returns the opaque node, the sorted-by-the-caller findings (`KF-E-310/314/315`, literal
+ * source) and `mentions`: the ascending input indexes the predicate reads.
+ */
+export function compileLogicPredicate(predicate, context, pointer) {
+  const findings = [];
+  const ctx = { inputs: context.inputs, bind: context.bind, registry: context.registry, findings, rule: { id: null, index: null } };
+  let node;
+  try {
+    node = compilePredicate(ctx, predicate, pointer, false, 0);
+  } catch (error) {
+    throw retarget(error, 'INVALID_EXPRESSION');
+  }
+  const found = new Set();
+  predicateInputs(node, found);
+  return { node, findings, mentions: [...found].sort((a, b) => a - b) };
+}
+
+/**
+ * Bind the supplied values (keyed by full ref or suffix) and type them against the declarations, in `inputs[]`
+ * order. `typed[i]` is the typed value of input i or null (absent, null, or a value that produced a finding);
+ * `diagnostics` holds `KF-E-310` / `KF-E-314` findings of source `value`.
+ */
+export function typeLogicValues(inputs, bind, values) {
+  if (!isRecord(values)) throw err('INVALID_ARGUMENT', 'values must be a mapping', { found: typeName(values) });
+  const diagnostics = [];
+  try {
+    const supplied = bindSupplied({ inputs, bind }, values);
+    const typed = inputs.map((input) => typeSupplied(input, supplied[input.index], diagnostics));
+    return { typed, diagnostics };
+  } catch (error) {
+    throw retarget(error, 'INVALID_EXPRESSION');
+  }
+}
+
+/** Evaluate a compiled predicate against the typed values of `typeLogicValues` (binary logic, E-0019). */
+export function evaluateLogicPredicate(node, typed) {
+  return evaluateNode(node, typed);
+}

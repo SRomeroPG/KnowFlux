@@ -65,3 +65,27 @@ function compareDiagnostics(x, y) {
 export function sortDiagnostics(diagnostics) {
   return [...diagnostics].sort(compareDiagnostics);
 }
+
+// Formula catalog rows (P012; errata E-0033, E-0036), copied once from section 42.2 (l.1768, l.1771) until the
+// catalog module of P028 exists. Kept apart from LOGIC_DIAGNOSTIC_CATALOG, whose five P011 rows are pinned by P011.
+const REMEDIATION_313 = 'añadir `guard`'; // l.1768
+
+export const FORMULA_DIAGNOSTIC_CATALOG = Object.freeze({
+  'KF-E-313': Object.freeze({ code: 'KF-E-313', severity: 'E', remediation: REMEDIATION_313 }), // División por cero no protegida (l.1768)
+  'KF-E-316': Object.freeze({ code: 'KF-E-316', severity: 'E' }), // Dimensión resultante inexistente en `units.yaml` (l.1771)
+});
+
+/**
+ * Build a formula diagnostic: `KF-E-313` and `KF-E-316` come from FORMULA_DIAGNOSTIC_CATALOG, any other code is
+ * delegated to makeDiagnostic (the P011 catalog). The catalog `remediation` is attached when one is defined (l.1600).
+ */
+export function makeFormulaDiagnostic(code, message, fields) {
+  if (!Object.hasOwn(FORMULA_DIAGNOSTIC_CATALOG, code)) return makeDiagnostic(code, message, fields);
+  const entry = FORMULA_DIAGNOSTIC_CATALOG[code];
+  const diagnostic = { code: entry.code, severity: entry.severity, message };
+  if (entry.remediation !== undefined) diagnostic.remediation = entry.remediation;
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) diagnostic[key] = value;
+  }
+  return diagnostic;
+}
