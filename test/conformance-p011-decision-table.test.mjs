@@ -26,7 +26,7 @@ import {
   allFiveCodes, input, inputs, multiKeyFindings, pair, permute, table, vals,
 } from '../framework/conformance/p011-decision-table/tables.mjs';
 
-const PENDING = 'P011 implementation pending'; // set to false to enforce the whole slice
+const PENDING = false; // enforced: was 'P011 implementation pending' while the engine was being built
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONF = path.join(REPO_ROOT, 'framework', 'conformance');

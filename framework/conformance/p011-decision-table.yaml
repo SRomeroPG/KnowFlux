@@ -14,7 +14,7 @@
 # Division (divideDecimal, DIVISION_BY_ZERO, INVALID_PRECISION) is removed from P011 (E-0022 D-04): no case.
 schema_version: 2.1
 phase: P011
-status: pending-implementation
+status: enforced
 
 # Every key of case_index has at least one test whose title starts with the key, and every test key is indexed
 # (checked by the runner, test "F-M"). cites = spec line / errata entry / PLAN target the expectation comes from.
