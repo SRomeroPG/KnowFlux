@@ -2,7 +2,7 @@
 
 ## Objective and authorization
 
-Implement §53 A2 after the independently accepted P001. The user invoked `NEXT_PHASE.md` for Phase 2. The frozen v2.1 specification is normative. P002 owns engine allocation from `.kf/id-registry.yaml`, provisional and permanent state, canonical promotion, merge collision behavior, and indefinite alias resolution. It does not implement the full P007 validator or other §53 items.
+Implement §53 A2 after the independently accepted P001. The user authorized Phase 2 on 2026-09-23. The frozen v2.1 specification is normative. P002 owns engine allocation from `.kf/id-registry.yaml`, provisional and permanent state, canonical promotion, merge collision behavior, and indefinite alias resolution. It does not implement the full P007 validator or other §53 items.
 
 ## Entry gate
 

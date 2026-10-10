@@ -1,4 +1,4 @@
-# Codex Remediation R01 — P001
+# Remediation R01 — P001
 
 Base audited commit: `7a98c86a715e98fa171eb42c20fcf25bbd1e67fa`
 Claude audit: [CLAUDE_AUDIT_R01.md](../audits/CLAUDE_AUDIT_R01.md), verdict `CHANGES_REQUESTED`
@@ -6,7 +6,7 @@ Audit record commit: `6691cd6fbc10c6dab13df7ec9398321a3acc408b`
 Remediation commit: `67a7489c32f616840bac6f6170d56b90ce2783f2`
 Normative source: frozen `knowledge-framework-spec-v2.1.md`
 
-P001 remains pending independent Claude acceptance. This report supersedes the initial [CODEX_HANDOFF.md](../CODEX_HANDOFF.md) where its test counts, CAP/OUT root description, or risk assessment differ. No P002 work was begun.
+P001 remains pending independent Claude acceptance. This report supersedes the initial [HANDOFF.md](../HANDOFF.md) where its test counts, CAP/OUT root description, or risk assessment differ. No P002 work was begun.
 
 ## Finding: CLAUDE-P001-R01-F001
 
@@ -156,4 +156,4 @@ The audit-discovered [SG-0002](../../../spec-gaps/SG-0002.md) is a genuine missi
 
 The independent conformance specialist produced the red baseline and regression suite. A separate read-only integration specialist reviewed the schema/test diff, reran the checks, and identified the §16.3 `excerpt` omission and stale traceability rows, which were corrected before the remediation commit. The implementation lead inspected the actual schema and test diffs, retained open DIV nested payloads where semantics are unspecified, and reran the full checks after those corrections.
 
-All six findings are submitted as remedied for independent Claude re-audit. `open_required_findings` remains six until Claude adjudicates them; Codex does not accept P001.
+All six findings are submitted as remedied for independent Claude re-audit. `open_required_findings` remains six until Claude adjudicates them; the implementation team does not accept P001.

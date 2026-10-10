@@ -4,7 +4,7 @@ Development-only coordination layer for the single-vendor Claude Strike Team v2.
 
 ## Operating rules
 
-- `PROTOCOL_V2.md` is the operating protocol. `AI_STRIKE_TEAM_BOOTSTRAP.md` is the historical v1 protocol (Codex implements, Claude audits) and is superseded. Codex is retired.
+- `PROTOCOL_V2.md` is the operating protocol. The v1 two-team protocol was removed on 2026-10-09 (see ADR-0001).
 - The Knowledge Framework Core Specification v2.1 is frozen and normative. Semantic gaps are decided by the Foreman in `knowledge-framework-spec-v2.1-errata.md` (repo root); the spec itself is never edited.
 - A root Claude session, the Foreman (skill `/knowflux-foreman`), orchestrates Claude implementer agents and independent Claude auditor agents. Only an audit may accept a phase.
 - Phase lifecycle: PLANNED, IMPLEMENTING, READY_FOR_AUDIT, AUDITING, CHANGES_REQUESTED, REMEDIATING, REAUDITING, ACCEPTED, BLOCKED_BY_DECISION, STALLED.
@@ -27,10 +27,9 @@ Development-only coordination layer for the single-vendor Claude Strike Team v2.
 - `STATE.yaml` — authoritative phase-state record (`schema_version: 2`).
 - `PHASES.md` — roadmap DAG, tracks and phase registry.
 - `SCOREBOARD.md` — conformance and Milestone 1 progress with executable evidence.
-- `ENVIRONMENT.md` — recorded runtime capabilities (Codex section retired).
+- `ENVIRONMENT.md` — recorded runtime capabilities.
 - `phases/` — one directory per opened phase (PLAN, TRACEABILITY, HANDOFF, audits).
 - `spec-gaps/` — SG records; each now resolved by or mapped to an errata entry.
 - `decisions/` — ADRs for development-process decisions.
 - `future-backlog/` — non-v2.1 ideas only.
-- `AI_STRIKE_TEAM_BOOTSTRAP.md` — historical v1 protocol, superseded.
 - Repo root: `knowledge-framework-spec-v2.1.md` (frozen), `knowledge-framework-spec-v2.1-errata.md` (Foreman decisions).

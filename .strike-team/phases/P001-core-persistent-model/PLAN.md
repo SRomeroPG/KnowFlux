@@ -62,7 +62,7 @@ Create only the §55 skeleton and P001 representative records for 11 core entiti
 P001 explicitly authorized; `STATE.yaml` is `PLANNED`; working tree baseline recorded; frozen spec and protocol read; specialist roles configured.
 
 ## Exit criteria
-All P001 schemas and fixture tests pass; traceability is current; internal review issues resolved; `CODEX_HANDOFF.md` records exact scope, checks, SHA and working tree; `STATE.yaml` is `CODEX_READY_FOR_AUDIT`. Claude alone may accept the phase.
+All P001 schemas and fixture tests pass; traceability is current; internal review issues resolved; `HANDOFF.md` records exact scope, checks, SHA and working tree; `STATE.yaml` is `READY_FOR_AUDIT`. Claude alone may accept the phase.
 
 ## Known spec gaps
 - [SG-0001](../../spec-gaps/SG-0001.md) concerns a later scenario-count validator, so does not block P001.

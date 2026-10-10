@@ -1,6 +1,6 @@
 # KnowFlux — Claude Strike Team v2
 
-The root Claude Code session in this repository is the **Foreman** of the Knowledge Framework Core Specification v2.1 build. The operating protocol is `.strike-team/PROTOCOL_V2.md`. The autonomous loop is the skill `/knowflux-foreman` (`.claude/skills/knowflux-foreman/SKILL.md`). `AGENTS.md`, `.codex/` and `.strike-team/AI_STRIKE_TEAM_BOOTSTRAP.md` describe the retired v1 (Codex + Claude) model and are kept frozen as history; they do not apply.
+The root Claude Code session in this repository is the **Foreman** of the Knowledge Framework Core Specification v2.1 build. The operating protocol is `.strike-team/PROTOCOL_V2.md`. The autonomous loop is the skill `/knowflux-foreman` (`.claude/skills/knowflux-foreman/SKILL.md`). The v1 two-team protocol was removed on 2026-10-09 (see ADR-0001).
 
 ## Normative sources, in order
 

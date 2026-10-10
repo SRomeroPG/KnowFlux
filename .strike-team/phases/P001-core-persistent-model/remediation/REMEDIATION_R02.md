@@ -1,4 +1,4 @@
-# Codex Remediation R02 — P001
+# Remediation R02 — P001
 
 Base audited commit: `1004f2450c28f715357f1818bd761ac79fa9e865`
 Claude re-audit: [CLAUDE_AUDIT_R02.md](../audits/CLAUDE_AUDIT_R02.md), verdict `CHANGES_REQUESTED`
@@ -43,4 +43,4 @@ The independent conformance specialist authored and ran the focused red-to-green
 
 R02 advisory A1 about a database column literally named `created_at` inside DIV `difference` values is non-blocking and unchanged by this remediation. P017 can evaluate it when emitting differences. SG-0001 and SG-0002 remain open for their later workstreams; no P001 semantic decision was invented.
 
-R02-F001 is submitted as remedied for independent Claude re-audit. `open_required_findings` remains one until Claude adjudicates it; Codex does not accept P001.
+R02-F001 is submitted as remedied for independent Claude re-audit. `open_required_findings` remains one until Claude adjudicates it; the implementation team does not accept P001.

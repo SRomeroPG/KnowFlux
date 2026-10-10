@@ -17,7 +17,7 @@ In scope:
 - `test/p001-schema.test.mjs`.
 - `framework/conformance/acme-formulation/**` and `framework/conformance/invalid/p001/**`.
 - `package.json`.
-- The P001 `PLAN.md`, `TRACEABILITY.md` and `CODEX_HANDOFF.md`, treated as untrusted claims.
+- The P001 `PLAN.md`, `TRACEABILITY.md` and `HANDOFF.md`, treated as untrusted claims.
 
 Out of scope, and not demanded: the engine behavior of §53 A2–A5 and B–G. That covers ID allocation, EvidenceResolver, confidence computation, full `kf validate`, logic evaluation, DIV derivation, the graph, context/impact/diff, and cross-file integrity. Those areas were checked only for whether the P001 persistent shape would conflict with them.
 
@@ -183,7 +183,7 @@ It breaks exactly the property §10.5 cites as the reason BP is faceted: executi
 
 ### Remediation constraint
 - BP and DE `identity` must not accept any §7.1 authored edge, any facet payload, or any facet-scoped or derived facet field.
-- The spec does not define BP/DE identity content. Codex may close `identity` or constrain it, but must not invent required BP/DE identity fields or signature semantics; §6.1/§6.2 define the signature only for BR.
+- The spec does not define BP/DE identity content. The implementation team may close `identity` or constrain it, but must not invent required BP/DE identity fields or signature semantics; §6.1/§6.2 define the signature only for BR.
 - Add negatives for each of the cases above.
 - Correct TRACEABILITY T09 so it cites identity-level evidence.
 
@@ -235,7 +235,7 @@ Non-faceted types are the ones where a hand-written `computed_confidence` or `ve
 
 ### Remediation constraint
 - CAP and OUT must reject the content listed under "Expected behavior".
-- Closing the roots to the common entity fields, as the other nine schemas do, satisfies this without inventing semantics, because §13 places descriptive prose in `.md`. Codex may choose another mechanism if it achieves the same rejections.
+- Closing the roots to the common entity fields, as the other nine schemas do, satisfies this without inventing semantics, because §13 places descriptive prose in `.md`. The implementation team may choose another mechanism if it achieves the same rejections.
 - Do not add unstated required fields to CAP or OUT.
 - Add negatives for each reproduced case.
 
@@ -406,7 +406,7 @@ These are not defects: the §55 final counts, resolver states, `expected/` outpu
 
 ## 9. SPEC_GAPs
 
-- **SG-0001** (Codex, pre-existing): the §7.3 R3 versus §26.2 narrative scenario minimum. Independently confirmed as a real contradiction. It affects P007/P014, not P001. It does not block.
+- **SG-0001** (implementation team, pre-existing): the §7.3 R3 versus §26.2 narrative scenario minimum. Independently confirmed as a real contradiction. It affects P007/P014, not P001. It does not block.
 - **SG-0002** (new, audit-discovered): `.strike-team/spec-gaps/SG-0002.md`. It covers the address grammar for observed targets (configurable dimensions, required `repository`), the field-suffix/dot ambiguity, and escaping of scope values in `canonical(scope)` and `[k=v]`. It affects P007, P014, P016, P017, P020–P022 and P024. **It does not block P001:** the persisted open maps foreclose none of the alternatives.
 
 Neither gap blocks this phase. The verdict rests on F001–F006.

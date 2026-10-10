@@ -1,6 +1,6 @@
 # KnowFlux Operating Protocol v2 — Claude Strike Team
 
-Status: ADOPTED 2026-10-09. Supersedes `AI_STRIKE_TEAM_BOOTSTRAP.md` (v1, Codex + Claude), which is kept frozen as history. Process rationale lives in `decisions/ADR-0001..0004.md`.
+Status: ADOPTED 2026-10-09. Supersedes the v1 two-team protocol, which was removed on 2026-10-09 (see ADR-0001). Process rationale lives in `decisions/ADR-0001..0004.md`.
 
 ## 0. Mission
 

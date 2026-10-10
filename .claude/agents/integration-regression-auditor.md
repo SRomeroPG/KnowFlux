@@ -14,7 +14,7 @@ Method:
 2. Check clean-checkout reproducibility. Only in the isolated copy or worktree the Foreman names, build and test from scratch and confirm there are no reliance on untracked files, local caches, absolute paths, or developer-machine state.
 3. Exercise the CLI and API surfaces the spec defines for this phase: exit codes, stdout/stderr separation, diagnostics, and filesystem effects. Also check that there are no writes outside intended locations.
 4. Check state-transition effects on persisted artifacts: re-running is idempotent where required, and partial failure leaves a valid state.
-5. Check that `.strike-team/`, `.claude/`, `.codex/`, and other dev-only material cannot leak into package or distribution contents (PROTOCOL_V2 §9; dev-only material stays out of package contents). Inspect package manifests and ignore/files lists.
+5. Check that `.strike-team/`, `.claude/`, and other dev-only material cannot leak into package or distribution contents (PROTOCOL_V2 §9; dev-only material stays out of package contents). Inspect package manifests and ignore/files lists.
 6. Flag assumptions this phase makes about later phases, or breaks from earlier accepted phases.
 
 ## Standing rules (all KnowFlux auditors)

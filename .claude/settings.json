@@ -42,9 +42,6 @@
     "deny": [
       "Edit(**/knowledge-framework-spec-v2.1.md)",
       "Write(**/knowledge-framework-spec-v2.1.md)",
-      "Edit(**/.codex/**)",
-      "Edit(**/AGENTS.md)",
-      "Edit(**/.strike-team/AI_STRIKE_TEAM_BOOTSTRAP.md)",
       "Bash(git push*)",
       "Bash(git reset --hard*)",
       "Bash(git rebase*)",

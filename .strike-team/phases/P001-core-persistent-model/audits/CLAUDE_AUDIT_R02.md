@@ -2,7 +2,7 @@
 
 Audited commit: 1004f2450c28f715357f1818bd761ac79fa9e865 (handoff; remediation commit 67a7489c32f616840bac6f6170d56b90ce2783f2)
 Previous audit: [CLAUDE_AUDIT_R01.md](CLAUDE_AUDIT_R01.md) at 7a98c86
-Remediation report: [CODEX_REMEDIATION_R01.md](../remediation/CODEX_REMEDIATION_R01.md), treated as an untrusted claim
+Remediation report: [REMEDIATION_R01.md](../remediation/REMEDIATION_R01.md), treated as an untrusted claim
 Working tree during re-audit: clean
 Normative source: `knowledge-framework-spec-v2.1.md` (frozen)
 
@@ -10,10 +10,10 @@ Normative source: `knowledge-framework-spec-v2.1.md` (frozen)
 
 This is a focused re-audit under bootstrap §17. It covers three things:
 - Each R01 finding, re-verified from the original evidence against the actual change.
-- The regression protection Codex added.
+- The regression protection the implementation team added.
 - A regression audit of every file the remediation touched: 7 schemas, `test/p001-schema.test.mjs`, `framework/conformance/spec-examples/**`, `PLAN.md` and `TRACEABILITY.md`.
 
-Areas the remediation did not touch were not re-audited. Codex did not modify the R01 audit file, SG-0001 or SG-0002.
+Areas the remediation did not touch were not re-audited. The implementation team did not modify the R01 audit file, SG-0001 or SG-0002.
 
 The orchestrator worked alone and used no subagents: the change set is small, and every check below is directly reproducible.
 
@@ -26,7 +26,7 @@ The orchestrator worked alone and used no subagents: the change set is small, an
 | `npm run build` | exit 0: "Compiled 19 JSON Schemas." |
 | `npm run lint` | exit 0 |
 | `npm test` | 143/143 pass |
-| Orchestrator probes (`scratchpad/orch/r2.mjs`) | Uses the R01 harness (`scripts/check-schemas.mjs#loadSchemas()` and `yaml` with `uniqueKeys`). Spec examples are read directly from the spec file by line range, not from Codex's copies. |
+| Orchestrator probes (`scratchpad/orch/r2.mjs`) | Uses the R01 harness (`scripts/check-schemas.mjs#loadSchemas()` and `yaml` with `uniqueKeys`). Spec examples are read directly from the spec file by line range, not from the implementation team's copies. |
 
 ## 3. Re-verification of R01 findings
 
@@ -37,7 +37,7 @@ The orchestrator worked alone and used no subagents: the change set is small, an
 | F003 (MEDIUM) CAP/OUT open | CAP `{epistemic, version, relationships.contains}` and OUT `{computed_confidence, verification}`: **INVALID**. CAP/OUT with every common field (`id_status`, `type`, `name`, `lifecycle`): VALID. | Roots closed with `unevaluatedProperties: false`; nothing new is required. | 22 negatives, including nested `relationships.contains`, `meta.created_at` and arbitrary keys. | **CLOSED** |
 | F004 (MEDIUM) DIV `statement` and timestamps | `disposition.statement`: **INVALID**. `statement` nested inside an array inside `difference.observed`: **INVALID**. | A recursive `propertyNames` guard over objects and arrays; the root is closed with an explicit property list. | 10 nested negatives (`proof`, `disposition`, `owner`, `resolution`, `detected`). | **CLOSED**. See advisory A1. |
 | F005 (LOW) classification/proof | `behavioral-divergence` with `path-diff`: **INVALID**. Behavioral with scenario-differential and ≥1 SC: VALID. `undetermined` with `{}`: VALID, which leaves the unconstrained classes unchanged as required. | Conditional `if/then` on `detected`. | 4 negatives: `{}`, `path-diff`, scenario proof without scenarios, and an empty list. | **CLOSED** |
-| F006 (MEDIUM) test and traceability weakness | The new tests assert the specific instance location and offending property, not a prefix of `/specified`. Positives now include the verbatim spec examples. T04, T08–T10, T19, T22, T29 and T29b now cite the nested evidence that exists. | `expectInvalidAt`/`nestedNegative` helpers; spec-derived cases. | 143 tests. Codex reports a 139-test red baseline against the R01 schemas with 60 failures. That claim was not re-run; the per-finding reproductions above independently confirm that the protected cases were defects. | **CLOSED** |
+| F006 (MEDIUM) test and traceability weakness | The new tests assert the specific instance location and offending property, not a prefix of `/specified`. Positives now include the verbatim spec examples. T04, T08–T10, T19, T22, T29 and T29b now cite the nested evidence that exists. | `expectInvalidAt`/`nestedNegative` helpers; spec-derived cases. | 143 tests. The implementation team reports a 139-test red baseline against the R01 schemas with 60 failures. That claim was not re-run; the per-finding reproductions above independently confirm that the protected cases were defects. | **CLOSED** |
 
 ## 4. Regression audit of modified areas
 
@@ -68,7 +68,7 @@ Status: OPEN
 -        }, "additionalProperties": false },
 +        }, "additionalProperties": true },
 ```
-This is the `detected.comparison` object. At the audited R01 commit, `comparison` was closed. No R01 finding asked for this. `CODEX_REMEDIATION_R01.md` does not mention it, and no test exercises `comparison` beyond the two spec keys.
+This is the `detected.comparison` object. At the audited R01 commit, `comparison` was closed. No R01 finding asked for this. `REMEDIATION_R01.md` does not mention it, and no test exercises `comparison` beyond the two spec keys.
 
 ### Actual behavior
 `detected.comparison: {specified: BR-0001#specified, observed: BR-0001#observed:a, observed_backend: BR-0001#observed:backend, note: "free text claim"}` → **VALID** at HEAD. It was **INVALID** at 7a98c86.
@@ -87,7 +87,7 @@ This remediation silently loosened an engine-owned persistent contract, in the s
 
 ### Remediation constraint
 - Restore `detected.comparison` to reject properties other than `specified` and `observed`.
-- If Codex opened it on purpose, record the spec basis in the remediation report; the frozen text shows none.
+- If the implementation team opened it on purpose, record the spec basis in the remediation report; the frozen text shows none.
 - Add a negative for an extra comparison key.
 - Do not change the other DIV rules.
 

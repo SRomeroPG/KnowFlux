@@ -2,7 +2,6 @@
 
 | Path | Status | Purpose |
 |---|---|---|
-| `000.md`, `001.md`, `002.md`, `003-Reusable.md` | History | v1 audit-era prompts (Codex implements, Claude audits; `AI_STRIKE_TEAM_BOOTSTRAP.md`). Kept for the record; superseded by Protocol v2. |
 | `foreman/` | Current | Protocol v2 (`.strike-team/PROTOCOL_V2.md`): launch guide, agent brief templates, ratification prompt. |
 
 Current files in `foreman/`:

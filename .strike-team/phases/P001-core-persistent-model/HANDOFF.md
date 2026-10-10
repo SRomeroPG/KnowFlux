@@ -1,4 +1,4 @@
-# Codex Implementation Handoff — P001
+# Implementation Handoff — P001
 
 ## Phase and audit target
 
@@ -26,7 +26,7 @@ The individual SHALL/SHALL NOT mapping and evidence are in [TRACEABILITY.md](TRA
 
 ## Files created or changed
 
-- Control plane: `.strike-team/PHASES.md`, `.strike-team/STATE.yaml`, `phases/P001-core-persistent-model/{PLAN,TRACEABILITY,CODEX_HANDOFF}.md`, `spec-gaps/SG-0001.md`.
+- Control plane: `.strike-team/PHASES.md`, `.strike-team/STATE.yaml`, `phases/P001-core-persistent-model/{PLAN,TRACEABILITY,HANDOFF}.md`, `spec-gaps/SG-0001.md`.
 - Schemas: `framework/schemas/{capability,business-process,business-rule,data-entity,outcome,scenario,evidence,unknown,change,divergence,dispute}.schema.json`; `{business-process,business-rule,data-entity}-{specified,observed}.schema.json`; `common.schema.json`; `logic.schema.json`.
 - Fixtures: `framework/conformance/acme-formulation/README.md`, its `knowledge/**/*.yaml` and `changes/CHG-0001.yaml`; `framework/conformance/invalid/p001/*.yaml`.
 - Tooling/tests/docs: `package.json`, `package-lock.json`, `eslint.config.js`, `scripts/check-schemas.mjs`, `test/p001-schema.test.mjs`, `.gitignore`, `README.md`.
@@ -65,4 +65,4 @@ P001 slice: 1 CAP, 1 BP with specified and observed, 2 BR (one mapping, one list
 
 ## Traceability and verdict boundary
 
-P001 schema-level rows are marked `PASS`; later semantic checks are explicitly `DEFERRED` to their §53 owner. Codex has not accepted P001. Only the independent Claude audit may set an accepted verdict. Do not begin P002 before that gate.
+P001 schema-level rows are marked `PASS`; later semantic checks are explicitly `DEFERRED` to their §53 owner. The implementation team has not accepted P001. Only the independent Claude audit may set an accepted verdict. Do not begin P002 before that gate.

@@ -2,7 +2,7 @@
 
 Audited commit: 48348f2d62a61055f5aa96287b4cce3409f9e8dc (handoff; remediation commit c738bd6675bb44c80ef890daf28b335718fbe9c5)
 Previous audits: [R01](CLAUDE_AUDIT_R01.md) at 7a98c86; [R02](CLAUDE_AUDIT_R02.md) at 1004f24
-Remediation report: [CODEX_REMEDIATION_R02.md](../remediation/CODEX_REMEDIATION_R02.md), treated as an untrusted claim
+Remediation report: [REMEDIATION_R02.md](../remediation/REMEDIATION_R02.md), treated as an untrusted claim
 Working tree during re-audit: clean
 Normative source: `knowledge-framework-spec-v2.1.md` (frozen)
 
