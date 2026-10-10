@@ -260,6 +260,17 @@ export async function promoteIds(projectRoot, options) {
     if (!Array.isArray(commits) || commits.some((sha) => typeof sha !== 'string' || !COMMIT_PATTERN.test(sha))) {
       throw new IdRegistryError('GIT_FAILED', 'the history reader returned something other than a list of full lowercase commit SHAs');
     }
+    // E-0029 / E-0035 (2): promotion writes only from a checkout positioned at the canonical tip. A reader without
+    // headCommit is treated as positioned there.
+    if (typeof history.headCommit === 'function') {
+      const head = await history.headCommit();
+      if (typeof head !== 'string' || !COMMIT_PATTERN.test(head)) {
+        throw new IdRegistryError('GIT_FAILED', 'the history reader returned a headCommit that is not a full lowercase commit SHA');
+      }
+      if (head !== commits.at(-1)) {
+        return { canonical_branch: branch, promoted: [], renumbered: [], entities_rewritten: [], entities_skipped: [], diagnostics: [], skipped: 'not_canonical_tip' };
+      }
+    }
     const items = registeredItems(model, entities);
     const actual = items.filter((item) => item.eff === item.id); // pending renumbers are converged, never promoted
     const plan = new Map(items.map((item) => [item.path, item.eff])); // repo path -> ID the file will carry
@@ -319,12 +330,19 @@ export async function promoteIds(projectRoot, options) {
       };
       if (sameIdentity(item, desired)) continue;
       const text = projectEntityText(item.text, desired);
-      if (text !== item.text) rewrites.push({ path: item.path, text });
+      if (text !== item.text) rewrites.push({ path: item.path, text, expected: item.text });
     }
 
     if (added.length > 0) await appendEvents(root, loaded, added, options.rename, lockContext);
+    // Audit R02 F03 / E-0035 (3): a file whose bytes changed after the scan is not overwritten (the rename is guarded
+    // by a re-read just before it); it is reported in entities_skipped and converges on the next run.
+    const rewritten = [];
+    const entitiesSkipped = [];
     for (const rewrite of rewrites) {
-      await atomicWrite(path.join(root, ...rewrite.path.split('/')), rewrite.text, { rename: options.rename, ...lockContext });
+      const done = await atomicWrite(path.join(root, ...rewrite.path.split('/')), rewrite.text, {
+        rename: options.rename, expectedText: rewrite.expected, ...lockContext,
+      });
+      (done ? rewritten : entitiesSkipped).push(rewrite.path);
     }
 
     const finalItems = items.map((item) => ({ ...item, eff: plan.get(item.path) ?? item.eff }));
@@ -332,7 +350,8 @@ export async function promoteIds(projectRoot, options) {
       canonical_branch: branch,
       promoted: promoteEvents.map(({ id, path: eventPath, commit }) => ({ id, path: eventPath, commit })),
       renumbered,
-      entities_rewritten: rewrites.map((rewrite) => rewrite.path),
+      entities_rewritten: rewritten,
+      entities_skipped: entitiesSkipped,
       diagnostics: offenderDiagnostics(post, finalItems),
     };
   });

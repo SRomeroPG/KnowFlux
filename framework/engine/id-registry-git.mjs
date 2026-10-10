@@ -56,7 +56,9 @@ async function resolveBranch(cwd, branch) {
 /**
  * Reader backed by the git executable, rooted at `projectRoot` (paths are resolved relative to it).
  * firstParentCommits(branch): `git rev-list --first-parent --reverse` of the commit the branch resolves to.
- * readFile(commit, repoPath): UTF-8 text of the file at that commit, null if absent.
+ * readFile(commit, repoPath): UTF-8 text of the file at that commit; null only when the path is genuinely absent from the
+ * commit's tree (or is not a file). A blob, tree or commit that cannot be read is GIT_FAILED / HISTORY_INCOMPLETE.
+ * headCommit(): full SHA of the checkout's HEAD (E-0035 (2)); the E-0029 tip check compares it with the branch tip.
  */
 export function createGitHistoryReader(projectRoot) {
   const cwd = path.resolve(projectRoot);
@@ -80,11 +82,26 @@ export function createGitHistoryReader(projectRoot) {
       const blob = await git(cwd, ['cat-file', 'blob', `${commit}:./${repoPath}`]);
       if (blob.status === 0) return blob.stdout.toString('utf8');
       const known = await git(cwd, ['rev-parse', '--verify', '--quiet', `${commit}^{commit}`]);
-      if (known.status === 0) return null; // the commit exists: the path is absent there (or is not a file)
       if (known.status === 1 && known.stderr.trim() === '') {
         throw new IdRegistryError('HISTORY_INCOMPLETE', `commit ${commit} is not available in this repository`);
       }
-      throw failed('cat-file', blob);
+      if (known.status !== 0) throw failed('cat-file', blob);
+      // The commit exists. A failed read is "path absent" only if the tree says so (audit R02 F02); an entry that the
+      // tree lists as a blob but whose object cannot be read is a failure, never null.
+      // --literal-pathspecs: a repo path such as `:(glob)x` or `a[1].yaml` must be matched literally.
+      const listing = await git(cwd, ['--literal-pathspecs', 'ls-tree', '-z', commit, '--', repoPath]);
+      if (listing.status !== 0) throw failed('ls-tree', listing);
+      for (const record of listing.stdout.toString('utf8').split('\u0000')) {
+        if (/^[0-7]+ blob /.test(record)) throw failed('cat-file', blob);
+      }
+      return null;
+    },
+
+    async headCommit() {
+      const head = await git(cwd, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
+      const sha = head.stdout.toString('utf8').trim();
+      if (head.status !== 0 || !/^[0-9a-f]{40,64}$/.test(sha)) throw failed('rev-parse HEAD', head);
+      return sha;
     },
   };
 }

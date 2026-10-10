@@ -194,12 +194,15 @@ export function buildModel(events) {
   }
   const holder = new Map([...promotes].map(([id, record]) => [id, record.path]));
   const movesSeen = new Set();
+  const moveLog = new Map(); // id -> [{index, to}] applied moves in replay order (E-0034 judges aliases at their position)
   for (const [index, event] of events.entries()) {
     if (event.op !== 'move') continue;
     if (!holder.has(event.id)) throw invalid(`event ${index}: move of ${event.id}, which has no promote`);
     const key = `${event.id}\u0000${event.from}\u0000${event.to}`;
     if (holder.get(event.id) === event.from) {
       holder.set(event.id, event.to);
+      if (!moveLog.has(event.id)) moveLog.set(event.id, []);
+      moveLog.get(event.id).push({ index, to: event.to });
     } else if (!movesSeen.has(key)) {
       throw invalid(`event ${index}: move.from is not the current path of ${event.id}`);
     }
@@ -234,9 +237,22 @@ export function buildModel(events) {
     aliasesFrom.get(alias.from).push(alias);
     aliasesTo.get(alias.to).push(alias);
   }
-  // l.318 / E-0024 (2): a permanent ID is never renumbered; the file holding it must not be the renumbered entity.
+  // l.318 / E-0024 (2) as amended by E-0034 and E-0035 (1): a permanent ID is never renumbered. Judged at the alias's
+  // replay position: invalid iff `from` already has a promote and its holder path there (promote path followed through
+  // the moves before the alias) is the anchor, or a promote of `from` at the anchor path comes later. Later moves into
+  // the anchor are legitimate path reuse.
   for (const alias of aliases) {
-    if (promotes.has(alias.from) && holder.get(alias.from) === alias.rpath) {
+    const promote = promotes.get(alias.from);
+    if (promote === undefined) continue;
+    let contradicts;
+    if (promote.index > alias.index) {
+      contradicts = promote.path === alias.rpath;
+    } else {
+      let at = promote.path;
+      for (const move of moveLog.get(alias.from) ?? []) if (move.index < alias.index) at = move.to;
+      contradicts = at === alias.rpath;
+    }
+    if (contradicts) {
       throw invalid(`event ${alias.index}: alias ${alias.from} -> ${alias.to} renumbers the permanent holder of ${alias.from} at ${alias.rpath}`);
     }
   }

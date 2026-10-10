@@ -55,8 +55,12 @@ export async function renameWithRetry(rename, from, to, { pollMs, deadlineMs }, 
   }
 }
 
-/** Write `content` to `file` atomically: temporary file in the same directory, flush, rename over the target. */
-export async function atomicWrite(file, content, { rename = fsRename, pollMs = 20, deadlineMs = 5000 } = {}) {
+/**
+ * Write `content` to `file` atomically: temporary file in the same directory, flush, rename over the target.
+ * With `expectedText` (audit R02 F03) the target is re-read immediately before the rename; if it no longer holds exactly
+ * that text (changed or removed by someone else) nothing is replaced and the result is false. Otherwise true.
+ */
+export async function atomicWrite(file, content, { rename = fsRename, pollMs = 20, deadlineMs = 5000, expectedText } = {}) {
   const temporary = `${file}.${randomUUID()}.tmp`;
   let handle = null;
   try {
@@ -65,7 +69,15 @@ export async function atomicWrite(file, content, { rename = fsRename, pollMs = 2
     await handle.sync();
     await handle.close();
     handle = null;
+    if (expectedText !== undefined) {
+      const current = await readFile(file, 'utf8').catch(() => null);
+      if (current !== expectedText) {
+        await rm(temporary, { force: true });
+        return false;
+      }
+    }
     await renameWithRetry(rename, temporary, file, { pollMs, deadlineMs }, 'registry rename');
+    return true;
   } catch (error) {
     if (handle) await handle.close().catch(() => {});
     await rm(temporary, { force: true }).catch(() => {});
