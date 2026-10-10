@@ -5,6 +5,9 @@
 #   .strike-team/phases/P002-id-registry/PLAN.md (incl. "Foreman decisions after planning"),
 #   knowledge-framework-spec-v2.1.md (l.298-321, 325-372, 1108-1120, 1742, 2075-2103),
 #   knowledge-framework-spec-v2.1-errata.md (E-0001..E-0004, E-0007, E-0009..E-0015).
+# Round R01 remediation cases (F-M1, F-M2, F-E14..F-E19, F-D14, F-B5 and the U+FF5E / U+1F600 tie pair) were added
+# after audit R01 (.strike-team/phases/P002-id-registry/audits/AUDIT_R01.md, findings F01-F10) from that file,
+# PLAN.md and errata E-0001, E-0004, E-0007, E-0009..E-0016, E-0023, E-0024 only; the engine was not read.
 # Runner: test/conformance-p002-id-registry.test.mjs (engine API phase, E-0014: there is no kf
 # binary and no framework/conformance/expected/ runner yet; P028 ports this slice).
 #
@@ -30,11 +33,14 @@ case_index:
   F-B2: {targets: [V-11], cites: ["spec l.304", "E-0013"], expect: "6 processes x 5 allocations -> 30 distinct contiguous IDs"}
   F-B3: {targets: [V-12, V-13, V-14, V-15, V-16, V-17, V-22], cites: ["E-0013", "E-0015 D-04"], expect: "stale iff old AND same host AND pid dead; otherwise LOCK_TIMEOUT with lock and registry untouched; owner-less lock never broken"}
   F-B4: {targets: [V-18, V-19, V-20, V-21], cites: ["E-0013", "PLAN lock and atomic write"], expect: "lock released on every path; rename failure leaves registry byte-identical and no tmp; EPERM/EBUSY/EACCES retried; other errors propagate unchanged"}
+  F-B5: {targets: [V-12, V-17, AUDIT_R01-F07], cites: ["E-0013", "PLAN lock and atomic write (owner.json format)", "AUDIT_R01 F07"], expect: "owner.json written by the engine while the lock is held is exactly {pid, host, acquired_at} = process.pid, os.hostname(), a current ISO-8601 UTC time; a lock held by a killed child process is recovered end to end with a small staleAfterMs"}
   F-C1: {targets: [V-23], cites: ["E-0014", "E-0015 D-01", "E-0015 D-05"], expect: "missing registry never recreated (REGISTRY_MISSING); init refusals; empty registry bytes exact"}
   F-C2: {targets: [V-24], cites: ["PLAN registry file (reader validity)"], expect: "INVALID_YAML / INVALID_REGISTRY, file unchanged; null and [] events accepted"}
   F-C3: {targets: [V-25], cites: ["E-0012", "PLAN registry file (reader validity)"], expect: "each invalid event row is INVALID_REGISTRY; each valid near-miss reads"}
   F-C4: {targets: [V-26], cites: ["E-0012"], expect: "duplicate provisional allocate replays; next ID skips it"}
   F-C5: {targets: [V-27], cites: ["E-0007", "E-0015 D-05"], expect: "real git union merge keeps both allocate lines, parseable, next BR-0002; both-first-event variant too"}
+  F-M1: {targets: [V-27, AUDIT_R01-F01, AUDIT_R01-F10], cites: ["E-0007", "E-0012", "E-0024 (1)", "AUDIT_R01 F01"], expect: "real git union merge of two branches that each ran promoteIds (allocateId in opposite orders): registry reads, repeat promoteIds adds no event, duplicate promote/alias lines are single no-op repeats"}
+  F-M2: {targets: [AUDIT_R01-F01, AUDIT_R01-F10], cites: ["E-0012", "E-0024 (1)", "AUDIT_R01 F01"], expect: "exact duplicate promote, alias and move lines (adjacent or not) read as no-op repeats; a different second promote, an alias with the same from and anchor but another to, and a non-repeat move with a stale from stay INVALID_REGISTRY"}
   F-C6: {targets: [V-28], cites: ["E-0012"], expect: "allocate after promote (any line order) replays"}
   F-D1: {targets: [V-29], cites: ["spec l.315", "E-0001"], expect: "non-canonical entity stays provisional, nothing mutated"}
   F-D2: {targets: [V-30, V-31, V-37], cites: ["spec l.316", "spec l.1117", "E-0009", "E-0011"], expect: "merge, fast-forward, squash each record promote with the first first-parent commit carrying the file with that id"}
@@ -48,11 +54,18 @@ case_index:
   F-D10: {targets: [V-47], cites: ["PLAN promoteIds item 5"], expect: "registry rename failure leaves registry and entities unchanged; all events of a call land in one registry write before any entity rewrite"}
   F-D11: {targets: [V-30], cites: ["spec l.316", "E-0009"], expect: "an unpromoted entity present in the first canonical commit is promoted with that commit"}
   F-D12: {targets: [V-32, V-34], cites: ["PLAN createGitHistoryReader contract"], expect: "default reader returns git rev-list --first-parent --reverse output, file text or null, rejects unresolved/dash-leading branches"}
+  F-D14: {targets: [AUDIT_R01-F04, AUDIT_R01-F10], cites: ["E-0001", "E-0009", "E-0024 (4)", "AUDIT_R01 F04"], expect: "canonical branch is resolved only as refs/heads/<name> then refs/remotes/origin/<name>: same-named tag does not shadow; revision expressions, HEAD, tag-only names and invalid ref names are CANONICAL_BRANCH_UNRESOLVED; remote-only branch resolves; replace objects are ignored"}
   F-D13: {targets: [V-31, V-34], cites: ["E-0009"], expect: "injected history reader: first sha whose file parses to a mapping with that id"}
   F-E1: {targets: [V-38, V-45], cites: ["spec l.317", "E-0002", "E-0009", "E-0011", "E-0015 D-02"], expect: "two provisional colliders in different canonical commits: later renumbered, alias event, no KF-E-101"}
   F-E2: {targets: [V-39], cites: ["E-0002", "E-0015 D-02"], expect: "same-commit tie resolved by ascending UTF-8 byte order of the repo path"}
   F-E3: {targets: [V-40], cites: ["E-0002", "E-0015 D-02b", "E-0015 D-02c"], expect: "three colliders: one survivor, two aliases, fresh IDs in total order, exact event order"}
   F-E4: {targets: [V-41], cites: ["E-0011", "E-0015 D-02"], expect: "new ID promoted by a later call, alias retained; alias chain recorded oldest first"}
+  F-E14: {targets: [AUDIT_R01-F02, AUDIT_R01-F10, V-41], cites: ["spec l.319", "E-0011", "E-0016 (2a)", "E-0024 (3)", "AUDIT_R01 F02"], expect: "id_alias follows the renumbered entity: (a) promoted then moved with a recorded move keeps id_alias at the new path; (b) still provisional, relocated without a record then promoted keeps id_alias and promotes the new path; (c) an unrelated holder of the target ID gets no id_alias even after its own recorded move"}
+  F-E15: {targets: [AUDIT_R01-F03, AUDIT_R01-F10], cites: ["spec l.318", "E-0024 (2)", "AUDIT_R01 F03"], expect: "an alias whose anchor path is the current holder path (promote path followed through moves) of alias.from is INVALID_REGISTRY; near-misses where the holder is elsewhere, moved away, or never promoted read"}
+  F-E16: {targets: [V-38, V-41, AUDIT_R01-F05], cites: ["E-0015 D-02(a)", "E-0009", "AUDIT_R01 F05"], expect: "loser entering at a non-tip first-parent index: the persisted alias event commit is that commit, not the tip and not the winner's commit (injected history and real git)"}
+  F-E17: {targets: [V-40, AUDIT_R01-F06], cites: ["E-0015 D-02(c)", "E-0023 (1a)", "AUDIT_R01 F06"], expect: "BR and DE colliders in one commit, path order opposite to ID order: promote BR-0001, promote DE-0001, allocate BR-0002, alias BR-0001->BR-0002, allocate DE-0002, alias DE-0001->DE-0002"}
+  F-E18: {targets: [V-46, AUDIT_R01-F08], cites: ["E-0011", "AUDIT_R01 F08"], expect: "an entity whose only drift is a missing id_alias is rewritten (id_alias gains the aliased-from ID) and then converges"}
+  F-E19: {targets: [AUDIT_R01-F09], cites: ["E-0015 D-03(a)", "AUDIT_R01 F09"], expect: "unregistered is sorted by id first, then path (not by path alone)"}
   F-E5: {targets: [V-42, V-45], cites: ["spec l.318", "spec l.1742", "E-0010", "E-0015 D-03c"], expect: "provisional vs permanent: KF-E-101 on the non-matching path only, no event, holder untouched, other IDs still promoted"}
   F-E6: {targets: [V-43], cites: ["E-0010"], expect: "two permanent claims: KF-E-101 on the non-matching path only"}
   F-E7: {targets: [V-44], cites: ["E-0004"], expect: "unrecorded move is KF-E-101; recorded move, name change and recreate at same path are clean"}
@@ -181,6 +194,137 @@ tables:
     - {name: upper-vs-lower, winner: "Z", loser: "a"}
     - {name: ascii-vs-multibyte, winner: "z", loser: "\u00e9"}
     - {name: dash-vs-slash, winner: "a-b", loser: "a"}
+    # E-0002 (UTF-8 byte order, not UTF-16 code units): U+FF5E is EF BD 9E, U+1F600 is F0 9F 98 80, so U+FF5E wins;
+    # in UTF-16 order the surrogate pair D83D DE00 would sort first. AUDIT_R01 A-05.
+    - {name: fullwidth-tilde-vs-emoji, winner: "\uFF5E", loser: "\U0001F600"}
+  # F-M2 (E-0024 (1)): appended to the base registry allocate BR-0001@<A>, BR-0002@<B>, BR-0003@<G>.
+  # <Sa> <Sb> are 40-hex commits ('a' x 40, 'b' x 40). Every row must READ and leave the registry usable
+  # (next BR is BR-0004, append-only). Exact repeats (all fields equal) are no-ops, adjacent or not.
+  idempotent_events:
+    - name: dup-promote-adjacent
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+    - name: dup-promote-nonadjacent
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: promote, id: BR-0002, path: <B>, commit: <Sb>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+    - name: dup-alias-adjacent
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sa>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sa>}'
+    - name: dup-alias-nonadjacent
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sa>}'
+        - '{op: promote, id: BR-0003, path: <G>, commit: <Sb>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sa>}'
+    - name: dup-move-adjacent
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+    - name: dup-move-nonadjacent
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: promote, id: BR-0002, path: <B>, commit: <Sb>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+    - name: union-merge-shape-promote-alias-twice
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+  # F-M2: rows appended to the same base registry; every one is INVALID_REGISTRY (fail closed, file unchanged).
+  conflicting_events:
+    - name: second-promote-different-path
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <G>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: promote, id: BR-0001, path: <G>, commit: <Sa>}'
+    - name: second-promote-different-commit-nonadjacent
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: promote, id: BR-0002, path: <B>, commit: <Sb>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sb>}'
+    - name: move-not-a-repeat-and-from-is-not-current
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <B>}'
+    - name: alias-same-from-and-anchor-different-to
+      lines:
+        - '{op: allocate, id: BR-0004, id_status: provisional, path: <B>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sa>}'
+        - '{op: alias, from: BR-0001, to: BR-0004, commit: <Sa>}'
+  # F-E15 (E-0024 (2), spec l.318): complete event lists (no base). Placeholders as above.
+  permanent_renumber_invalid:
+    - name: audit-r01-f03
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: holder-path-reached-through-a-recorded-move
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <G>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: alias-line-before-the-promote-line
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+  permanent_renumber_valid:
+    - name: holder-is-another-path
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <B>}'
+        - '{op: promote, id: BR-0001, path: <B>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: holder-moved-away-from-the-anchor
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: alias-from-never-promoted
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+  # F-D14 (E-0024 (4)): names that are not a branch. The scratch repository has branch main (4 commits), a tag
+  # named main at HEAD~2, a tag v1, and a reflog for main. Each must reject CANONICAL_BRANCH_UNRESOLVED.
+  not_a_branch:
+    - "main~1"
+    - "main^"
+    - "main^0"
+    - "main@{0}"
+    - "main@{yesterday}"
+    - "@{-1}"
+    - "HEAD"
+    - "v1"
+    - "tags/v1"
+    - "refs/tags/v1"
+    - "refs/heads/main"
+    - "origin/main"
+    - "main..HEAD"
+    - "a..b"
+    - "a b"
+    - "a~b"
+    - "a:b"
+    - "a?b"
+    - "a*b"
+    - "a[b"
+    - "a//b"
+    - "a.lock"
+    - ".hidden"
+    - "-x"
   # F-C2 rows: exact registry file bytes and the expected code.
   corrupt_registries:
     - {name: unparsable-flow, text: "schema_version: 2.1\nevents: [invalid\n", code: INVALID_YAML}

@@ -134,5 +134,79 @@ export async function buildE5(E, label) {
   };
 }
 
+/**
+ * F-M1 (a), audit R01 F01 / E-0024 (1): main holds BR-0001 (provisional, committed). Branch ba runs promoteIds and
+ * then allocateId; branch bb runs allocateId and then promoteIds; both are merged into main with --no-ff. The
+ * union merge leaves two byte-identical `promote` lines at non-adjacent positions.
+ */
+export async function buildUnionPromote(E, label) {
+  const repo = await makeBase(label);
+  const allocation = await allocWrite(E, repo, 'BR', A, 'Alpha');
+  const M0 = await repo.commit('main holds BR-0001');
+  await repo.checkout('ba', { create: true });
+  await promote(E, repo.dir);
+  const x1 = await E.allocateId(repo.dir, 'BR', br('x1'));
+  await repo.commit('ba: promote, then allocate');
+  await repo.checkout('main');
+  await repo.checkout('bb', { create: true });
+  const y1 = await E.allocateId(repo.dir, 'BR', br('y1'));
+  await promote(E, repo.dir);
+  await repo.commit('bb: allocate, then promote');
+  await repo.checkout('main');
+  const MA = await repo.mergeNoFf('ba', 'merge ba');
+  const MB = await repo.mergeNoFf('bb', 'merge bb');
+  return { repo, dir: repo.dir, allocation, M0, MA, MB, x1, y1 };
+}
+
+/**
+ * F-M1 (b): the F-E1 state (BR-0001 collision, renumbering pending) on main; branch p1 runs promoteIds and then
+ * allocates a DE; branch p2 allocates a DE and then runs promoteIds. Both branches write the same promote,
+ * allocate BR-0002 and alias events; the union merge duplicates all three at non-adjacent positions.
+ */
+export async function buildUnionRenumber(E, label) {
+  const ctx = await buildE1(E, label);
+  const { repo } = ctx;
+  await repo.checkout('p1', { create: true });
+  await promote(E, repo.dir);
+  await E.allocateId(repo.dir, 'DE', 'knowledge/data/x1/entity.yaml');
+  await repo.commit('p1: promote, then allocate');
+  await repo.checkout('main');
+  await repo.checkout('p2', { create: true });
+  await E.allocateId(repo.dir, 'DE', 'knowledge/data/y1/entity.yaml');
+  await promote(E, repo.dir);
+  await repo.commit('p2: allocate, then promote');
+  await repo.checkout('main');
+  ctx.MP1 = await repo.mergeNoFf('p1', 'merge p1');
+  ctx.MP2 = await repo.mergeNoFf('p2', 'merge p2');
+  return ctx;
+}
+
+/**
+ * F-E17, audit R01 F06: BR-0001 colliders at knowledge/business-rules/b1,b2 and DE-0001 colliders at
+ * knowledge/a-data/d1,d2 enter canonical in one commit. Path order (a-data first) is the opposite of ID order.
+ */
+export const dePath = (dir) => `knowledge/a-data/${dir}/entity.yaml`;
+
+export async function buildE17(label) {
+  const repo = await makeBase(label);
+  await repo.checkout('feat', { create: true });
+  const paths = { b1: br('b1'), b2: br('b2'), d1: dePath('d1'), d2: dePath('d2') };
+  await writeRegistry(repo.dir, registryText([
+    alloc('CAP-0001', SEED_PATH),
+    alloc('BR-0001', paths.b1), alloc('BR-0001', paths.b2),
+    alloc('DE-0001', paths.d1), alloc('DE-0001', paths.d2),
+  ]));
+  await repo.write(paths.b1, entityText({ id: 'BR-0001', name: 'b1' }));
+  await repo.write(paths.b2, entityText({ id: 'BR-0001', name: 'b2' }));
+  await repo.write(paths.d1, entityText({ id: 'DE-0001', name: 'd1', type: 'data-entity' }));
+  await repo.write(paths.d2, entityText({ id: 'DE-0001', name: 'd2', type: 'data-entity' }));
+  await repo.commit('feat');
+  await repo.checkout('main');
+  const M = await repo.mergeNoFf('feat', 'M');
+  const orig = {};
+  for (const key of Object.keys(paths)) orig[key] = await repo.read(paths[key]);
+  return { repo, dir: repo.dir, M, paths, orig };
+}
+
 export { A, B, G };
 export const noopHistory = { firstParentCommits: async () => [], readFile: async () => null };

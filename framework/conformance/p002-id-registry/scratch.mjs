@@ -14,6 +14,7 @@ export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 export const ENGINE_URL = process.env.KF_P002_ENGINE_URL
   ?? pathToFileURL(path.join(REPO_ROOT, 'framework', 'engine', 'id-registry.mjs')).href;
 export const CHILD_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'child-allocator.mjs');
+export const HOLDER_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'child-lock-holder.mjs');
 export const REGISTRY_REL = '.kf/id-registry.yaml';
 
 // ---------------------------------------------------------------- temporary directories
@@ -32,10 +33,15 @@ export async function cleanupTemp() {
   }
 }
 
+// Git variables that would redirect a scratch repository to the caller's repository (audit R01 A-07).
+const INHERITED_GIT_VARS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE'];
+
 export function run(cmd, args, { cwd, env } = {}) {
+  const childEnv = { ...process.env, ...env };
+  for (const name of INHERITED_GIT_VARS) delete childEnv[name];
   return new Promise((resolve, reject) => {
     execFile(cmd, args, {
-      cwd, env: { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true,
+      cwd, env: childEnv, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true,
     }, (error, stdout, stderr) => {
       if (error) {
         reject(Object.assign(new Error(`${cmd} ${args.join(' ')} failed: ${stderr || error.message}`), { stdout, stderr }));
@@ -55,6 +61,28 @@ export function runChild(args, timeoutMs = 120000) {
       else resolve(stdout);
     });
   });
+}
+
+/**
+ * F-B5: a child process that takes the registry lock through the engine and then hangs inside the registry
+ * rename (see child-lock-holder.mjs). `ready` resolves once the lock is held; `exited` after the child is gone.
+ */
+export function spawnLockHolder(projectRoot, readyTimeoutMs = 60000) {
+  const child = spawn(process.execPath, [HOLDER_SCRIPT, projectRoot], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  let out = '';
+  let err = '';
+  child.stderr.on('data', (chunk) => { err += chunk; });
+  const exited = new Promise((resolve) => { child.once('exit', resolve); });
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`lock holder never reported the lock; stderr: ${err}`)), readyTimeoutMs);
+    child.stdout.on('data', (chunk) => {
+      out += chunk;
+      if (out.includes('locked')) { clearTimeout(timer); resolve(); }
+    });
+    child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`lock holder exited early (${code}); stderr: ${err}`)); });
+  });
+  ready.catch(() => {});
+  return { child, ready, exited };
 }
 
 /** PID of a process that has certainly exited (spawn, wait). */

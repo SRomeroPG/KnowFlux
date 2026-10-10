@@ -6,9 +6,12 @@
 // citations live in framework/conformance/p002-id-registry.yaml; scenario builders in
 // framework/conformance/p002-id-registry/. Case ids (F-xx) and targets (V-nn) are those of the PLAN.
 //
-// Every case is marked todo while the engine is being built: it runs and reports but does not fail
-// `npm test`. Removing the marker is the one-line change below (PENDING = false). Expectations are never
-// weakened to pass.
+// The slice is enforced: PENDING is false, so every case below runs as a normal test and a failing
+// expectation fails `npm test`. Expectations are never weakened to pass.
+//
+// Round R01 remediation (audit .strike-team/phases/P002-id-registry/audits/AUDIT_R01.md, findings F01-F10)
+// added F-M1, F-M2, F-E14..F-E19, F-D14, F-B5 and the U+FF5E / U+1F600 tie pair. They were written from the
+// audit, PLAN.md and errata E-0001, E-0004, E-0007, E-0009..E-0016, E-0023, E-0024 without reading the engine.
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
@@ -18,14 +21,15 @@ import { pathToFileURL } from 'node:url';
 import YAML from 'yaml';
 import { loadSchemas } from '../scripts/check-schemas.mjs';
 import {
-  A, B, ENGINE_URL, FAKE_SHA, G, HEADER, REGISTRY_REL, REPO_ROOT, Repo, SEED_PATH,
+  A, B, ENGINE_URL, FAKE_SHA, G, HEADER, LOCK_REL, REGISTRY_REL, REPO_ROOT, Repo, SEED_PATH,
   alloc, aliasEv, assertProjection, br, cleanupTemp, entityText, eventLine, eventLines, exitedPid,
   isoAgo, lockLeftovers, moveEv, oracleFirstCanonical, parseRegistryText, plantLock, promo,
-  registryBytes, registryEvents, registryText, run, runChild, snapshot, tmpLeftovers, tmpProject, writeRegistry,
+  registryBytes, registryEvents, registryText, run, runChild, snapshot, spawnLockHolder, tmpLeftovers, tmpProject,
+  writeRegistry,
 } from '../framework/conformance/p002-id-registry/scratch.mjs';
 import {
-  allocWrite, appendRegistryLine, buildE1, buildE1Promoted, buildE2, buildE3, buildE5, buildFeature,
-  makeBase, noopHistory, promote,
+  allocWrite, appendRegistryLine, buildE1, buildE1Promoted, buildE17, buildE2, buildE3, buildE5, buildFeature,
+  buildUnionPromote, buildUnionRenumber, dePath, makeBase, noopHistory, promote,
 } from '../framework/conformance/p002-id-registry/scenarios.mjs';
 
 const PENDING = false; // slice enforced (was 'P002 implementation pending')
@@ -112,13 +116,19 @@ async function writeEntity(dir, repoPath, spec) {
 const readEntity = (dir, repoPath) => fs.readFile(path.join(dir, ...repoPath.split('/')), 'utf8');
 
 function fillRow(line, subst) {
-  return line.replaceAll('<A>', subst.A).replaceAll('<B>', subst.B).replaceAll('<G>', subst.G);
+  return line.replaceAll('<A>', subst.A).replaceAll('<B>', subst.B).replaceAll('<G>', subst.G)
+    .replaceAll('<Sa>', FAKE_SHA.a).replaceAll('<Sb>', FAKE_SHA.b);
 }
 
 const BASE_EVENTS = [alloc('BR-0001', A), alloc('BR-0002', B), alloc('BR-0003', G)];
 
 function rowRegistry(lines) {
   return registryText(BASE_EVENTS) + lines.map((l) => `  - ${fillRow(l, { A, B, G })}\n`).join('');
+}
+
+/** Complete event list without the base events (same placeholders). */
+function fullRegistry(lines) {
+  return HEADER + lines.map((l) => `  - ${fillRow(l, { A, B, G })}\n`).join('');
 }
 
 // ================================================================== Allocation and format
@@ -397,6 +407,78 @@ check('F-B4', 'lock released on success and failure; atomic write; rename retry;
   assert.equal((await registryEvents(other)).length, 2);
 });
 
+// Audit R01 F07 (V-12, V-17; E-0013): every earlier lock test plants owner.json by hand. These read the file the
+// ENGINE writes (PLAN "Lock and atomic write": {"pid": <int>, "host": <string>, "acquired_at": <ISO-8601 UTC string>}).
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+const ownerFile = (dir) => path.join(dir, ...LOCK_REL.split('/'), 'owner.json');
+
+function assertEngineOwner(owner, startedAt, endedAt, label) {
+  assert.deepEqual(Object.keys(owner).sort(), ['acquired_at', 'host', 'pid'], `${label}: exactly pid, host, acquired_at`);
+  assert.ok(Number.isInteger(owner.pid) && owner.pid > 0, `${label}: pid is a positive integer (got ${owner.pid})`);
+  assert.equal(owner.pid, process.pid, `${label}: pid is the process that took the lock`);
+  assert.equal(owner.host, os.hostname(), `${label}: host is os.hostname()`);
+  assert.equal(typeof owner.acquired_at, 'string');
+  assert.match(owner.acquired_at, ISO_UTC, `${label}: acquired_at is an ISO-8601 UTC string`);
+  const at = Date.parse(owner.acquired_at);
+  assert.ok(at >= startedAt - 1000 && at <= endedAt + 1000, `${label}: acquired_at is current (${owner.acquired_at})`);
+}
+
+check('F-B5', '(i) allocateId: owner.json written while the lock is held is exactly {pid, host, acquired_at}', async (E) => {
+  const dir = await seededProject([SEED], 'b5a');
+  let owner = null;
+  const spy = async (from, to) => {
+    if (path.basename(to) === 'id-registry.yaml') owner = JSON.parse(await fs.readFile(ownerFile(dir), 'utf8'));
+    return fs.rename(from, to);
+  };
+  const startedAt = Date.now();
+  await E.allocateId(dir, 'BR', br('x'), { rename: spy });
+  assert.ok(owner, 'the lock owner file existed while the registry was being written');
+  assertEngineOwner(owner, startedAt, Date.now(), 'allocateId');
+  assert.deepEqual(await lockLeftovers(dir), [], 'lock released');
+});
+
+check('F-B5', '(ii) promoteIds: the same owner file while promotion holds the lock', async (E) => {
+  const ctx = await buildFeature(E, 'b5b');
+  await ctx.repo.checkout('main');
+  await ctx.repo.mergeNoFf('feature', 'M');
+  let owner = null;
+  const spy = async (from, to) => {
+    if (path.basename(to) === 'id-registry.yaml') owner = JSON.parse(await fs.readFile(ownerFile(ctx.dir), 'utf8'));
+    return fs.rename(from, to);
+  };
+  const startedAt = Date.now();
+  await promote(E, ctx.dir, { rename: spy });
+  assert.ok(owner, 'the lock owner file existed while the registry was being written');
+  assertEngineOwner(owner, startedAt, Date.now(), 'promoteIds');
+});
+
+check('F-B5', '(iii) end to end: a lock held by a killed process is recovered with a small staleAfterMs', async (E) => {
+  const dir = await seededProject([SEED], 'b5c');
+  const holder = spawnLockHolder(dir);
+  try {
+    await holder.ready;
+    const owner = JSON.parse(await fs.readFile(ownerFile(dir), 'utf8'));
+    assert.deepEqual(Object.keys(owner).sort(), ['acquired_at', 'host', 'pid']);
+    assert.equal(owner.pid, holder.child.pid, 'owner.pid is the holder process, not the parent');
+    assert.equal(owner.host, os.hostname());
+    assert.match(owner.acquired_at, ISO_UTC);
+    // near-miss: while the holder is alive the lock is never broken, however small staleAfterMs is
+    const bytes = await registryBytes(dir);
+    await rejectsWith(E, E.allocateId(dir, 'BR', br('blocked'), { lock: { deadlineMs: 400, staleAfterMs: 1, pollMs: 10 } }), 'LOCK_TIMEOUT');
+    assert.equal(await registryBytes(dir), bytes, 'registry untouched while the holder lives');
+    await fs.stat(path.join(dir, ...LOCK_REL.split('/')));
+    holder.child.kill('SIGKILL');
+    await holder.exited;
+    // the holder died inside the registry rename: no registry change was ever published
+    const got = await E.allocateId(dir, 'BR', br('after'), { lock: { deadlineMs: 60000, staleAfterMs: 50, pollMs: 10 } });
+    assert.equal(got.id, 'BR-0001');
+    assert.equal((await registryEvents(dir)).length, 2);
+    assert.deepEqual(await lockLeftovers(dir), [], 'dead holder lock removed, new lock released');
+  } finally {
+    holder.child.kill('SIGKILL');
+  }
+});
+
 // ================================================================== Registry read and validity
 check('F-C1', 'missing registry is never recreated; init refusals; fresh registry bytes', async (E) => {
   for (const withKf of [false, true]) {
@@ -533,6 +615,87 @@ check('F-C6', 'allocate after promote replays in either order', async (E) => {
   for (const events of [forward, reversed]) {
     const dir = await seededProject(events, 'c6');
     assert.deepEqual((await E.readIdRegistry(dir)).events, events);
+  }
+});
+
+// Audit R01 F01/F10, E-0024 (1): a routine union merge must not disable the registry.
+check('F-M1', '(a) two branches each ran promoteIds (allocateId in opposite orders), union-merged', async (E) => {
+  const ctx = await buildUnionPromote(E, 'm1a');
+  const { dir } = ctx;
+  assert.equal(ctx.x1.id, 'BR-0002');
+  assert.equal(ctx.y1.id, 'BR-0002');
+  const text = await registryBytes(dir);
+  assert.ok(!/^(<<<<<<<|=======|>>>>>>>)/m.test(text), 'no conflict markers');
+  const promoteLines = eventLines(text).filter((line) => line.includes('op: promote'));
+  assert.equal(promoteLines.length, 2, 'precondition: the union merge left two promote lines');
+  assert.equal(promoteLines[0], promoteLines[1], 'precondition: they are byte-identical');
+  assert.ok(promoteLines[0].includes(ctx.M0), 'both record the commit where BR-0001 first appeared on main');
+  const registry = await E.readIdRegistry(dir); // E-0024 (1): must not throw
+  assert.ok(registry.events.some((e) => e.op === 'promote' && e.id === 'BR-0001' && e.path === A && e.commit === ctx.M0));
+
+  const before = await snapshot(dir);
+  const result = await promote(E, dir);
+  assert.deepEqual([result.promoted, result.renumbered, result.entities_rewritten, result.diagnostics], [[], [], [], []],
+    'a repeat promotion after the merge has nothing to do');
+  assert.deepEqual(await snapshot(dir), before, 'no new event and no rewrite');
+  const report = await E.checkIdCollisions(dir);
+  assert.deepEqual([report.diagnostics, report.unregistered], [[], []]);
+  const live = await E.resolveId(dir, 'BR-0001');
+  assert.deepEqual([live.status, live.path, live.warnings], ['live', A, []]);
+  assert.equal((await E.allocateId(dir, 'BR', br('z1'))).id, 'BR-0003', 'BR-0002 was allocated on both branches; the counter skips it');
+});
+
+check('F-M1', '(b) the same with a pending renumber: duplicate promote, allocate and alias lines', async (E) => {
+  const ctx = await buildUnionRenumber(E, 'm1b');
+  const { dir, repo } = ctx;
+  const text = await registryBytes(dir);
+  const lines = (op) => eventLines(text).filter((line) => line.includes(`op: ${op}`));
+  assert.equal(lines('promote').length, 2, 'precondition: duplicated promote');
+  assert.equal(lines('alias').length, 2, 'precondition: duplicated alias');
+  await E.readIdRegistry(dir); // must not throw
+  const live = await E.resolveId(dir, 'BR-0001');
+  assert.equal(live.status, 'live');
+  assert.equal(live.warnings.length, 1, 'a duplicated alias line is one alias, so one shadowed_alias warning');
+  assert.deepEqual([live.warnings[0].alias_from, live.warnings[0].alias_to], ['BR-0001', 'BR-0002']);
+  // BR-0002 (file B) entered main with the merge of p1; promoting it is the only thing left to do
+  const entered = await oracleFirstCanonical(repo, 'main', B, 'BR-0002');
+  const eventsBefore = await registryEvents(dir);
+  const result = await promote(E, dir);
+  assert.deepEqual(result.promoted, [{ id: 'BR-0002', path: B, commit: entered }]);
+  assert.deepEqual([result.renumbered, result.diagnostics, result.entities_rewritten], [[], [], [B]],
+    'BR-0001 is already promoted and BR-0001 is not renumbered a second time');
+  assert.deepEqual((await registryEvents(dir)).slice(eventsBefore.length), [promo('BR-0002', B, entered)]);
+  assertProjection(await repo.read(B), ctx.origB, { id: 'BR-0002', id_status: 'permanent', id_alias: ['BR-0001'] });
+  const frozen = await registryBytes(dir);
+  const again = await promote(E, dir);
+  assert.deepEqual([again.promoted, again.renumbered, again.entities_rewritten], [[], [], []]);
+  assert.equal(await registryBytes(dir), frozen);
+});
+
+check('F-M2', 'exact duplicate promote, alias and move events are no-op repeats', async (E) => {
+  for (const row of T.idempotent_events) {
+    const dir = await tmpProject('m2');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = rowRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    await E.readIdRegistry(dir).catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    const got = await E.allocateId(dir, 'BR', br('n'));
+    assert.equal(got.id, 'BR-0004', `${row.name}: the registry stays usable`);
+    const after = await registryBytes(dir);
+    assert.ok(after.startsWith(text), `${row.name}: append-only, duplicates are not rewritten`);
+    assert.equal(eventLines(after).length, eventLines(text).length + 1, `${row.name}: exactly one line appended`);
+  }
+});
+
+check('F-M2', 'a non-identical conflicting promote, alias or move stays invalid (fail closed)', async (E) => {
+  for (const row of T.conflicting_events) {
+    const dir = await tmpProject('m2c');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = rowRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    await rejectsWith(E, E.readIdRegistry(dir), 'INVALID_REGISTRY').catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    await rejectsWith(E, E.allocateId(dir, 'BR', br('y')), 'INVALID_REGISTRY');
+    assert.equal(await registryBytes(dir), text, `${row.name}: file unchanged`);
   }
 });
 
@@ -781,6 +944,86 @@ check('F-D13', 'injected history reader: first sha whose file parses to a mappin
   assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: sha(4) }]);
   assert.ok(branches.length >= 1 && branches.every((b) => b === 'whatever/branch'));
   assert.ok(reads.length >= 1 && reads.every(([, p]) => p === A), 'files are read at their repo path');
+});
+
+// Audit R01 F04, E-0024 (4): the canonical branch is a branch, resolved as refs/heads/<name> then
+// refs/remotes/origin/<name>; Git ignores replace refs.
+check('F-D14', '(a) a same-named tag does not shadow the branch; revision expressions, tags and invalid names are rejected', async (E) => {
+  const repo = await makeBase('d14a');
+  for (const n of [2, 3, 4]) {
+    await repo.write(`notes/${n}.txt`, `${n}\n`);
+    await repo.commit(`c${n}`);
+  }
+  const all = await repo.firstParent('main');
+  assert.equal(all.length, 4);
+  await repo.git('checkout', '-q', '-b', 'side'); // gives "@{-1}" something to name
+  await repo.git('checkout', '-q', 'main');
+  await repo.git('tag', 'main', all[1]); // lightweight tag named like the branch, at HEAD~2
+  await repo.git('tag', 'v1', all[3]);
+  await repo.git('branch', 'release/1.0', all[2]);
+  const reader = E.createGitHistoryReader(repo.dir);
+  assert.deepEqual(await reader.firstParentCommits('main'), all, 'refs/heads/main wins over refs/tags/main');
+  assert.deepEqual(await reader.firstParentCommits('release/1.0'), all.slice(0, 3), 'near-miss: a branch name with a slash and a dot');
+  for (const bad of T.not_a_branch) {
+    await rejectsWith(E, reader.firstParentCommits(bad), 'CANONICAL_BRANCH_UNRESOLVED').catch((error) => {
+      error.message = `${JSON.stringify(bad)}: ${error.message}`;
+      throw error;
+    });
+  }
+});
+
+check('F-D14', '(b) promoteIds follows the branch, not a same-named tag; a tag-only name is refused unchanged', async (E) => {
+  const ctx = await buildFeature(E, 'd14b');
+  const { repo, dir } = ctx;
+  await repo.checkout('main');
+  const M = await repo.mergeNoFf('feature', 'M');
+  await repo.git('tag', 'main', repo.b0); // would hide the merge if tags won
+  await repo.git('tag', 'only-a-tag', M);
+  const before = await snapshot(dir);
+  await rejectsWith(E, E.promoteIds(dir, { canonicalBranch: 'only-a-tag' }), 'CANONICAL_BRANCH_UNRESOLVED');
+  await rejectsWith(E, E.promoteIds(dir, { canonicalBranch: 'main~0' }), 'CANONICAL_BRANCH_UNRESOLVED');
+  assert.deepEqual(await snapshot(dir), before, 'refusals leave registry and entities byte-identical');
+  const result = await promote(E, dir);
+  assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: M }]);
+});
+
+check('F-D14', '(c) a clone resolves a remote-only branch; a local branch wins over origin/<name>', async (E) => {
+  const origin = await makeBase('d14o');
+  await origin.checkout('release', { create: true });
+  await origin.write('notes/r.txt', 'r\n');
+  await origin.commit('release work');
+  await origin.checkout('main');
+  const flags = ['-c', 'core.autocrlf=false', '-c', 'core.eol=lf'];
+  const cloneDir = await tmpProject('d14c');
+  await run('git', [...flags, 'clone', '-q', pathToFileURL(origin.dir).href, cloneDir]);
+  const clone = new Repo(cloneDir);
+  assert.equal(await clone.git('branch', '--list', 'release'), '', 'precondition: no local release branch');
+  const reader = E.createGitHistoryReader(cloneDir);
+  const remoteRelease = await clone.firstParent('refs/remotes/origin/release');
+  assert.equal(remoteRelease.length, 2);
+  assert.deepEqual(await reader.firstParentCommits('release'), remoteRelease, 'refs/remotes/origin/release is the fallback');
+  await clone.write('notes/local.txt', 'l\n');
+  const local = await clone.commit('local work on main');
+  const localMain = await clone.firstParent('refs/heads/main');
+  assert.equal(localMain.at(-1), local);
+  assert.notDeepEqual(localMain, await clone.firstParent('refs/remotes/origin/main'));
+  assert.deepEqual(await reader.firstParentCommits('main'), localMain, 'the local branch wins');
+  await rejectsWith(E, reader.firstParentCommits('origin/release'), 'CANONICAL_BRANCH_UNRESOLVED');
+  await rejectsWith(E, reader.firstParentCommits('does-not-exist'), 'CANONICAL_BRANCH_UNRESOLVED');
+});
+
+check('F-D14', '(d) replace refs do not alter the history the engine reads', async (E) => {
+  const repo = await makeBase('d14d');
+  for (const n of [2, 3, 4]) {
+    await repo.write(`notes/${n}.txt`, `${n}\n`);
+    await repo.commit(`c${n}`);
+  }
+  const all = await repo.firstParent('main');
+  const tree = await repo.git('rev-parse', `${all[2]}^{tree}`);
+  const fake = await repo.git('commit-tree', tree, '-p', all[0], '-m', 'replacement');
+  await repo.git('replace', all[2], fake);
+  assert.notDeepEqual(await repo.firstParent('main'), all, 'precondition: plain git sees the replacement');
+  assert.deepEqual(await E.createGitHistoryReader(repo.dir).firstParentCommits('main'), all);
 });
 
 // ================================================================== Collisions and renumbering
@@ -1091,6 +1334,188 @@ check('F-E13', 'only knowledge/, changes/ and divergences/ yaml/yml records are 
     { id: 'CHG-0009', path: 'changes/CHG-0009.yml' },
     { id: 'DIV-0001', path: 'divergences/DIV-0001/divergence.yaml' },
   ]);
+});
+
+// ------------------------------------------------------------------ audit R01 remediation (F02, F03, F05, F06, F08, F09)
+check('F-E14', '(a) renumbered entity promoted, then moved with a recorded move: id_alias stays at the new path', async (E) => {
+  const ctx = await buildE1Promoted(E, 'e14a');
+  const { dir, repo } = ctx;
+  const second = await promote(E, dir); // BR-0002 promoted at B (F-E4)
+  assert.deepEqual(second.promoted.map((p) => [p.id, p.path]), [['BR-0002', B]], 'precondition');
+  await repo.commit('promotion of BR-0002');
+  const promotedText = await repo.read(B);
+  assert.deepEqual(YAML.parse(promotedText).id_alias, ['BR-0001'], 'precondition: B carries id_alias');
+  await repo.write(G, promotedText);
+  await repo.remove(B);
+  await appendRegistryLine(dir, moveEv('BR-0002', B, G));
+  await repo.commit('B moved to G with a recorded move');
+  assert.deepEqual((await E.checkIdCollisions(dir)).diagnostics, [], 'near-miss: a recorded move is not KF-E-101');
+
+  const registryBefore = await registryBytes(dir);
+  const result = await promote(E, dir);
+  assert.deepEqual([result.promoted, result.renumbered, result.entities_rewritten, result.diagnostics], [[], [], [], []],
+    'the moved file already carries the registry projection: nothing to rewrite');
+  assert.equal(await registryBytes(dir), registryBefore, 'no new event');
+  assert.equal(await repo.read(G), promotedText, 'id_alias is not erased by the move');
+  const moved = await E.resolveId(dir, 'BR-0002');
+  assert.deepEqual([moved.status, moved.path], ['live', G]);
+
+  // the same state with the alias missing from the moved file converges to the alias at the NEW path
+  const stripped = entityText({ id: 'BR-0002', status: 'permanent', name: 'Beta' });
+  await repo.write(G, stripped);
+  const healed = await promote(E, dir);
+  assert.deepEqual([healed.promoted, healed.renumbered, healed.diagnostics], [[], [], []]);
+  assert.deepEqual(healed.entities_rewritten, [G]);
+  assert.equal(await registryBytes(dir), registryBefore);
+  assertProjection(await repo.read(G), stripped, { id: 'BR-0002', id_status: 'permanent', id_alias: ['BR-0001'] });
+});
+
+check('F-E14', '(b) still provisional and relocated without a record, then promoted: id_alias kept, new path promoted', async (E) => {
+  const ctx = await buildE1(E, 'e14b');
+  const { dir, repo } = ctx;
+  await promote(E, dir); // renumbering events + projections, not committed yet
+  const relocated = br('BR-0002'); // directory renamed to match the new ID
+  const text = await repo.read(B);
+  assert.deepEqual(YAML.parse(text).id_alias, ['BR-0001'], 'precondition: the renumbered entity carries id_alias');
+  assert.equal(YAML.parse(text).id_status, 'provisional');
+  await repo.write(relocated, text);
+  await repo.remove(B);
+  const P2 = await repo.commit('renumbered entity relocated to match its new ID');
+  assert.equal(await oracleFirstCanonical(repo, 'main', relocated, 'BR-0002'), P2, 'oracle: first canonical commit at the new path');
+  const eventsBefore = await registryEvents(dir);
+  const result = await promote(E, dir);
+  assert.deepEqual(result.promoted, [{ id: 'BR-0002', path: relocated, commit: P2 }], 'the promote path is the new path');
+  assert.deepEqual([result.renumbered, result.diagnostics, result.entities_rewritten], [[], [], [relocated]]);
+  assert.deepEqual(await registryEvents(dir), [...eventsBefore, promo('BR-0002', relocated, P2)], 'only the promote event is added');
+  assertProjection(await repo.read(relocated), text, { id: 'BR-0002', id_status: 'permanent', id_alias: ['BR-0001'] });
+  const frozen = await registryBytes(dir);
+  const again = await promote(E, dir);
+  assert.deepEqual([again.promoted, again.renumbered, again.entities_rewritten], [[], [], []]);
+  assert.equal(await registryBytes(dir), frozen);
+});
+
+check('F-E14', '(c) an unrelated holder of the target ID gets no id_alias, even after its own recorded move', async (E) => {
+  const C = br('late');
+  const D = br('late-moved');
+  const events = [
+    alloc('BR-0001', A), alloc('BR-0001', B), promo('BR-0001', A, FAKE_SHA.a),
+    alloc('BR-0002', B), aliasEv('BR-0001', 'BR-0002', FAKE_SHA.b), // the renumbering of B
+    alloc('BR-0002', C), promo('BR-0002', C, FAKE_SHA.c), moveEv('BR-0002', C, D), // another entity's own BR-0002
+  ];
+  const dir = await seededProject(events, 'e14c');
+  await writeEntity(dir, A, { id: 'BR-0001', status: 'permanent', name: 'Alpha' });
+  await writeEntity(dir, D, { id: 'BR-0002', status: 'permanent', name: 'Late claimant' });
+  const before = await snapshot(dir);
+  const result = await E.promoteIds(dir, { canonicalBranch: 'main', history: noopHistory });
+  assert.deepEqual([result.promoted, result.renumbered, result.entities_rewritten, result.diagnostics], [[], [], [], []]);
+  assert.deepEqual(await snapshot(dir), before, 'D is not given id_alias: [BR-0001] (E-0016 2a, E-0024 3)');
+  const holder = await E.resolveId(dir, 'BR-0002');
+  assert.deepEqual([holder.status, holder.path], ['live', D]);
+});
+
+check('F-E15', 'an alias that renumbers the current holder of a permanent ID is INVALID_REGISTRY (spec l.318, E-0024 2)', async (E) => {
+  for (const row of T.permanent_renumber_invalid) {
+    const dir = await tmpProject('e15');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = fullRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    await rejectsWith(E, E.readIdRegistry(dir), 'INVALID_REGISTRY').catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    await rejectsWith(E, E.allocateId(dir, 'BR', br('y')), 'INVALID_REGISTRY');
+    assert.equal(await registryBytes(dir), text, `${row.name}: file unchanged`);
+  }
+  for (const row of T.permanent_renumber_valid) {
+    const dir = await tmpProject('e15v');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = fullRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    const registry = await E.readIdRegistry(dir).catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    assert.deepEqual(registry.events, parseRegistryText(text).events, `${row.name}: events read as written`);
+  }
+});
+
+check('F-E16', 'persisted alias.commit is the loser entering commit, not the tip or the winner commit (injected history)', async (E) => {
+  const sha = (n) => `${'b'.repeat(39)}${n}`;
+  const dir = await seededProject([alloc('BR-0001', A), alloc('BR-0001', B)], 'e16a');
+  await writeEntity(dir, A, { id: 'BR-0001', name: 'Alpha' });
+  await writeEntity(dir, B, { id: 'BR-0001', name: 'Beta' });
+  const presence = { [A]: [sha(3), sha(4)], [B]: [sha(2), sha(3), sha(4)] };
+  const history = {
+    firstParentCommits: async () => [1, 2, 3, 4].map(sha),
+    readFile: async (commit, p) => (presence[p]?.includes(commit) ? entityText({ id: 'BR-0001', name: p }) : null),
+  };
+  const eventsBefore = await registryEvents(dir);
+  await E.promoteIds(dir, { canonicalBranch: 'main', history });
+  assert.deepEqual(await registryEvents(dir), [...eventsBefore,
+    promo('BR-0001', B, sha(2)), alloc('BR-0002', A), aliasEv('BR-0001', 'BR-0002', sha(3))],
+  'alias.commit = the loser first-parent entry (index 2 of 0..3), not the tip (sha 4) and not the winner (sha 2)');
+  assert.deepEqual((await E.readIdRegistry(dir)).events.at(-1), aliasEv('BR-0001', 'BR-0002', sha(3)));
+});
+
+check('F-E16', 'persisted alias.commit with real Git when canonical history continues past the loser', async (E) => {
+  const ctx = await buildE1(E, 'e16b');
+  const { dir, repo, M1, M2 } = ctx;
+  await repo.write('notes/later.txt', 'later\n');
+  const tip = await repo.commit('later canonical commit');
+  assert.ok(new Set([M1, M2, tip]).size === 3, 'precondition: winner, loser and tip are three different commits');
+  const eventsBefore = await registryEvents(dir);
+  await promote(E, dir);
+  assert.deepEqual(await registryEvents(dir), [...eventsBefore,
+    promo('BR-0001', A, M1), alloc('BR-0002', B), aliasEv('BR-0001', 'BR-0002', M2)]);
+});
+
+check('F-E17', 'cross-ID order: promotes by ID, then each loser by ID (allocate, alias); path order is the opposite', async (E) => {
+  const ctx = await buildE17('e17');
+  const { dir, paths, M } = ctx;
+  assert.ok(Buffer.compare(Buffer.from(paths.d1), Buffer.from(paths.b1)) < 0, 'precondition: DE paths sort before BR paths');
+  const eventsBefore = await registryEvents(dir);
+  const result = await promote(E, dir);
+  assert.deepEqual(result.promoted, [
+    { id: 'BR-0001', path: paths.b1, commit: M },
+    { id: 'DE-0001', path: paths.d1, commit: M },
+  ]);
+  assert.deepEqual(result.renumbered, [
+    { from: 'BR-0001', to: 'BR-0002', path: paths.b2, commit: M },
+    { from: 'DE-0001', to: 'DE-0002', path: paths.d2, commit: M },
+  ]);
+  assert.deepEqual(result.entities_rewritten, sortBytes(Object.values(paths)));
+  assert.deepEqual(await registryEvents(dir), [...eventsBefore,
+    promo('BR-0001', paths.b1, M), promo('DE-0001', paths.d1, M),
+    alloc('BR-0002', paths.b2), aliasEv('BR-0001', 'BR-0002', M),
+    alloc('DE-0002', paths.d2), aliasEv('DE-0001', 'DE-0002', M)], 'E-0015 D-02(c), E-0023 (1a)');
+  assert.equal(dePath('d1'), paths.d1);
+  assertProjection(await ctx.repo.read(paths.b1), ctx.orig.b1, { id: 'BR-0001', id_status: 'permanent', id_alias: null });
+  assertProjection(await ctx.repo.read(paths.b2), ctx.orig.b2, { id: 'BR-0002', id_status: 'provisional', id_alias: ['BR-0001'] });
+  assertProjection(await ctx.repo.read(paths.d1), ctx.orig.d1, { id: 'DE-0001', id_status: 'permanent', id_alias: null });
+  assertProjection(await ctx.repo.read(paths.d2), ctx.orig.d2, { id: 'DE-0002', id_status: 'provisional', id_alias: ['DE-0001'] });
+});
+
+check('F-E18', 'an entity whose only drift is a missing id_alias is rewritten, then converged', async (E) => {
+  const dir = await seededProject([alloc('BR-0001', A), alloc('BR-0002', B), aliasEv('BR-0001', 'BR-0002', FAKE_SHA.a)], 'e18');
+  const drifted = entityText({ id: 'BR-0002', name: 'Beta' }); // BR-0002, provisional, no id_alias
+  await writeEntity(dir, B, { id: 'BR-0002', name: 'Beta' });
+  const registryBefore = await registryBytes(dir);
+  const result = await E.promoteIds(dir, { canonicalBranch: 'main', history: noopHistory });
+  assert.deepEqual([result.promoted, result.renumbered, result.diagnostics], [[], [], []]);
+  assert.deepEqual(result.entities_rewritten, [B]);
+  assert.equal(await registryBytes(dir), registryBefore, 'convergence writes no event');
+  assertProjection(await readEntity(dir, B), drifted, { id: 'BR-0002', id_status: 'provisional', id_alias: ['BR-0001'] });
+  const converged = await readEntity(dir, B);
+  const again = await E.promoteIds(dir, { canonicalBranch: 'main', history: noopHistory });
+  assert.deepEqual([again.promoted, again.renumbered, again.entities_rewritten], [[], [], []]);
+  assert.equal(await readEntity(dir, B), converged);
+});
+
+check('F-E19', 'unregistered is sorted by id first, then by path', async (E) => {
+  const dir = await seededProject([SEED], 'e19');
+  await writeEntity(dir, 'changes/CHG-0009.yaml', { id: 'CHG-0009', name: 'change', type: 'change' });
+  await writeEntity(dir, br('x'), { id: 'BR-0007', name: 'rule' });
+  assert.ok(Buffer.compare(Buffer.from('changes/CHG-0009.yaml'), Buffer.from(br('x'))) < 0, 'precondition: path order is CHG first');
+  const report = await E.checkIdCollisions(dir);
+  assert.deepEqual(report.unregistered, [
+    { id: 'BR-0007', path: br('x') },
+    { id: 'CHG-0009', path: 'changes/CHG-0009.yaml' },
+  ]);
+  assert.deepEqual(report.diagnostics, []);
 });
 
 // ================================================================== Resolution
