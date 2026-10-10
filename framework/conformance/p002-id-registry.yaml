@@ -8,6 +8,9 @@
 # Round R01 remediation cases (F-M1, F-M2, F-E14..F-E19, F-D14, F-B5 and the U+FF5E / U+1F600 tie pair) were added
 # after audit R01 (.strike-team/phases/P002-id-registry/audits/AUDIT_R01.md, findings F01-F10) from that file,
 # PLAN.md and errata E-0001, E-0004, E-0007, E-0009..E-0016, E-0023, E-0024 only; the engine was not read.
+# Round R02 remediation cases (F-D4 restated, F-D15..F-D18, F-M3, F-E20) were added after audit R02
+# (.strike-team/phases/P002-id-registry/audits/AUDIT_R02.md, findings F01-F05) from that file, PLAN.md and
+# errata E-0009, E-0011, E-0024, E-0028, E-0029, E-0034 only; the engine was not read.
 # Runner: test/conformance-p002-id-registry.test.mjs (engine API phase, E-0014: there is no kf
 # binary and no framework/conformance/expected/ runner yet; P028 ports this slice).
 #
@@ -41,11 +44,12 @@ case_index:
   F-C5: {targets: [V-27], cites: ["E-0007", "E-0015 D-05"], expect: "real git union merge keeps both allocate lines, parseable, next BR-0002; both-first-event variant too"}
   F-M1: {targets: [V-27, AUDIT_R01-F01, AUDIT_R01-F10], cites: ["E-0007", "E-0012", "E-0024 (1)", "AUDIT_R01 F01"], expect: "real git union merge of two branches that each ran promoteIds (allocateId in opposite orders): registry reads, repeat promoteIds adds no event, duplicate promote/alias lines are single no-op repeats"}
   F-M2: {targets: [AUDIT_R01-F01, AUDIT_R01-F10], cites: ["E-0012", "E-0024 (1)", "AUDIT_R01 F01"], expect: "exact duplicate promote, alias and move lines (adjacent or not) read as no-op repeats; a different second promote, an alias with the same from and anchor but another to, and a non-repeat move with a stale from stay INVALID_REGISTRY"}
+  F-M3: {targets: [AUDIT_R02-F04, AUDIT_R01-F03], cites: ["spec l.318", "E-0034", "E-0035 (1)", "E-0024 (2)", "E-0028 (1)", "AUDIT_R02 F04"], expect: "the permanent-renumber check is judged at the alias's replay position: a holder that moves into the anchor path AFTER the alias reads valid; a holder at the anchor path at the alias position (initially, or through an earlier recorded move, even if it moves away later) is INVALID_REGISTRY; a promote of the renumbered ID's source at the anchor path LATER in the file is INVALID_REGISTRY too (E-0035 1)"}
   F-C6: {targets: [V-28], cites: ["E-0012"], expect: "allocate after promote (any line order) replays"}
   F-D1: {targets: [V-29], cites: ["spec l.315", "E-0001"], expect: "non-canonical entity stays provisional, nothing mutated"}
   F-D2: {targets: [V-30, V-31, V-37], cites: ["spec l.316", "spec l.1117", "E-0009", "E-0011"], expect: "merge, fast-forward, squash each record promote with the first first-parent commit carrying the file with that id"}
   F-D3: {targets: [V-32], cites: ["E-0001", "PLAN promoteIds contract"], expect: "explicit canonicalBranch: custom name works, main never assumed, bad values rejected, nothing changes"}
-  F-D4: {targets: [V-33], cites: ["E-0001", "E-0009"], expect: "promotion uses the canonical branch history, not the checked-out branch"}
+  F-D4: {targets: [V-33, AUDIT_R02-F01], cites: ["E-0029 (supersedes PLAN F-D4 / V-33/V-35)", "E-0001", "E-0009", "AUDIT_R02 F01"], expect: "RESTATED under E-0029: with a feature branch checked out and main holding the merged entity, promoteIds returns skipped 'not_canonical_tip' with empty promoted/renumbered/entities_rewritten and writes nothing; after checking out main it promotes with main's first-parent commit"}
   F-D5: {targets: [V-34], cites: ["E-0009"], expect: "first-parent only; earlier commit with another id at the path does not count"}
   F-D6: {targets: [V-34], cites: ["PLAN createGitHistoryReader contract"], expect: "shallow clone -> HISTORY_INCOMPLETE, nothing changes; full clone works"}
   F-D7: {targets: [V-35], cites: ["E-0011", "PLAN promoteIds item 5"], expect: "repeat promotion is idempotent and writes nothing"}
@@ -54,6 +58,11 @@ case_index:
   F-D10: {targets: [V-47], cites: ["PLAN promoteIds item 5"], expect: "registry rename failure leaves registry and entities unchanged; all events of a call land in one registry write before any entity rewrite"}
   F-D11: {targets: [V-30], cites: ["spec l.316", "E-0009"], expect: "an unpromoted entity present in the first canonical commit is promoted with that commit"}
   F-D12: {targets: [V-32, V-34], cites: ["PLAN createGitHistoryReader contract"], expect: "default reader returns git rev-list --first-parent --reverse output, file text or null, rejects unresolved/dash-leading branches"}
+  F-D15: {targets: [AUDIT_R02-F01, V-33], cites: ["E-0029", "spec l.308", "spec l.316", "E-0024 (4)", "AUDIT_R02 F01"], expect: "promoteIds writes only when HEAD's commit equals the commit the canonical branch resolves to: (a) a feature checkout while main holds colliders and (b) a detached HEAD at an older main commit and (d, first half) a clone detached at an older origin/main commit return skipped 'not_canonical_tip' with empty promoted/renumbered/entities_rewritten and leave registry and entities byte-identical; (c) a detached HEAD exactly at the tip and (d, second half) a clone with only refs/remotes/origin/main detached at it promote normally"}
+  F-D19: {targets: [AUDIT_R02-F01], cites: ["E-0035 (2)", "E-0029"], expect: "an injected history reader that provides headCommit(): a SHA different from the last first-parent commit -> skipped 'not_canonical_tip' with no writes; equal -> promotes (readers without headCommit are treated as at the tip, so the older injected-history cases are unchanged)"}
+  F-D16: {targets: [AUDIT_R02-F01], cites: ["E-0029", "E-0024 (1)", "E-0007", "E-0002", "AUDIT_R02 F01 (p1.mjs)"], expect: "R02 merge regression: promoteIds on f2 (skipped), then on main (promote + renumber), commit, then merge f2: readIdRegistry succeeds, exactly one promote of BR-0001 (path A), the registry stays writable (later promotion of BR-0002 works)"}
+  F-D17: {targets: [AUDIT_R02-F02, V-34], cites: ["E-0009", "E-0002", "E-0024 (4)", "PLAN createGitHistoryReader contract (readFile: null if absent)", "AUDIT_R02 F02"], expect: "non-shallow repo whose old entity blob is missing from the object store: createGitHistoryReader(...).readFile(commit, path) and promoteIds at the canonical tip reject GIT_FAILED or HISTORY_INCOMPLETE, mutating nothing; a path genuinely absent from an existing commit (or the whole path missing) still reads as null"}
+  F-D18: {targets: [AUDIT_R02-F03], cites: ["PLAN promoteIds item 5 and 6", "E-0011 (atomically per file)", "E-0035 (3)", "AUDIT_R02 F03 (p6.mjs)"], expect: "a line appended to an entity file while promoteIds runs (injected history.readFile, or the injected registry rename) is never lost: the file is either rewritten with the edit kept or left byte-identical; a file left unrewritten is listed in entities_skipped (else []); the next promoteIds converges the identity keys, keeps the edit and adds no duplicate event; unedited files are rewritten normally"}
   F-D14: {targets: [AUDIT_R01-F04, AUDIT_R01-F10], cites: ["E-0001", "E-0009", "E-0024 (4)", "AUDIT_R01 F04"], expect: "canonical branch is resolved only as refs/heads/<name> then refs/remotes/origin/<name>: same-named tag does not shadow; revision expressions, HEAD, tag-only names and invalid ref names are CANONICAL_BRANCH_UNRESOLVED; remote-only branch resolves; replace objects are ignored"}
   F-D13: {targets: [V-31, V-34], cites: ["E-0009"], expect: "injected history reader: first sha whose file parses to a mapping with that id"}
   F-E1: {targets: [V-38, V-45], cites: ["spec l.317", "E-0002", "E-0009", "E-0011", "E-0015 D-02"], expect: "two provisional colliders in different canonical commits: later renumbered, alias event, no KF-E-101"}
@@ -66,6 +75,7 @@ case_index:
   F-E17: {targets: [V-40, AUDIT_R01-F06], cites: ["E-0015 D-02(c)", "E-0023 (1a)", "AUDIT_R01 F06"], expect: "BR and DE colliders in one commit, path order opposite to ID order: promote BR-0001, promote DE-0001, allocate BR-0002, alias BR-0001->BR-0002, allocate DE-0002, alias DE-0001->DE-0002"}
   F-E18: {targets: [V-46, AUDIT_R01-F08], cites: ["E-0011", "AUDIT_R01 F08"], expect: "an entity whose only drift is a missing id_alias is rewritten (id_alias gains the aliased-from ID) and then converges"}
   F-E19: {targets: [AUDIT_R01-F09], cites: ["E-0015 D-03(a)", "AUDIT_R01 F09"], expect: "unregistered is sorted by id first, then path (not by path alone)"}
+  F-E20: {targets: [AUDIT_R02-F05, V-41], cites: ["E-0024 (3) ('otherwise the unique file carrying Y whose path equals no path of any allocate Y event; otherwise none')", "E-0011", "AUDIT_R02 F05"], expect: "two relocated (non-anchor) files carry the renumbered ID: neither gets id_alias, no event, no rewrite; after one copy is deleted and the rest committed, promoteIds promotes the survivor and it carries id_alias: [BR-0001]"}
   F-E5: {targets: [V-42, V-45], cites: ["spec l.318", "spec l.1742", "E-0010", "E-0015 D-03c"], expect: "provisional vs permanent: KF-E-101 on the non-matching path only, no event, holder untouched, other IDs still promoted"}
   F-E6: {targets: [V-43], cites: ["E-0010"], expect: "two permanent claims: KF-E-101 on the non-matching path only"}
   F-E7: {targets: [V-44], cites: ["E-0004"], expect: "unrecorded move is KF-E-101; recorded move, name change and recreate at same path are clean"}
@@ -298,6 +308,52 @@ tables:
         - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
         - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
         - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+  # F-M3 (E-0034, spec l.318): complete event lists (no base), placeholders as above. X = BR-0001, Y = BR-0002.
+  replay_position_valid:
+    - name: audit-r02-d01-move-into-the-former-anchor-after-the-alias
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <B>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <B>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <B>}'
+    - name: later-moves-through-the-anchor-and-onward
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <B>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <B>}'
+        - '{op: move, id: BR-0001, from: <B>, to: <G>}'
+  replay_position_invalid:
+    - name: holder-at-the-anchor-when-the-alias-is-read
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: holder-reached-the-anchor-through-a-move-recorded-before-the-alias
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <B>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <B>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+    - name: later-promote-at-the-anchor-after-the-alias-line
+      cite: "E-0035 (1): a later promote of from at the anchor path contradicts the renumbering (same shape as F-E15 alias-line-before-the-promote-line)"
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+    - name: holder-at-the-anchor-at-the-alias-position-then-moves-away
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <A>}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: <Sa>}'
+        - '{op: allocate, id: BR-0002, id_status: provisional, path: <A>}'
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: <Sb>}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
   # F-D14 (E-0024 (4)): names that are not a branch. The scratch repository has branch main (4 commits), a tag
   # named main at HEAD~2, a tag v1, and a reflog for main. Each must reject CANONICAL_BRANCH_UNRESOLVED.
   not_a_branch:

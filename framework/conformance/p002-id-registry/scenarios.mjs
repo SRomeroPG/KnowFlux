@@ -2,11 +2,12 @@
 // Base commit B0: .gitattributes (union merge for the registry), .gitignore (lock dirs), a hand-written
 // registry holding exactly one seed `allocate CAP-0001` (non-empty list, E-0015 D-05), no entity of the
 // scenarios. The engine is only used for what the scenario is about (allocation, promotion).
+import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
   A, B, G, GITATTRIBUTES, GITIGNORE, REGISTRY_REL, Repo, SEED_PATH,
-  alloc, br, entityText, eventLine, registryText, writeRegistry,
+  alloc, br, entityText, eventLine, oracleFirstCanonical, registryText, writeRegistry,
 } from './scratch.mjs';
 
 export async function makeBase(label, { seedEntity = false } = {}) {
@@ -210,3 +211,43 @@ export async function buildE17(label) {
 
 export { A, B, G };
 export const noopHistory = { firstParentCommits: async () => [], readFile: async () => null };
+
+/**
+ * F-D16 (audit R02 F01, E-0029): the R02 merge scenario. main holds both colliders (F-E1 state, M1 = A, M2 = B);
+ * f2 (which only ever held B and the registry line for it) continues with c3, which also allocates a DE.
+ * Nothing is promoted yet. The caller promotes on f2 (skipped), then on main, commits, and merges f2.
+ */
+export async function buildMergeRegression(E, label) {
+  const ctx = await buildE1(E, label);
+  const { repo, dir } = ctx;
+  await repo.checkout('f2');
+  await repo.write('notes/f2.txt', 'f2 continues\n');
+  ctx.deAllocation = await E.allocateId(dir, 'DE', 'knowledge/data/x1/entity.yaml');
+  ctx.c3 = await repo.commit('f2 continues');
+  return ctx;
+}
+
+/**
+ * F-D17 (audit R02 F02, E-0009): non-shallow repository on main. A enters with content v1 (commit c1) and is
+ * edited to v2 (commit c2). The loose blob of v1 is then deleted from the object store, so `c1:A` names a
+ * missing object while the tree of c1 still lists it. A silent `null` would make c2 look like the first
+ * canonical commit.
+ */
+export async function buildBlobLoss(E, label) {
+  const repo = await makeBase(label);
+  const allocation = await allocWrite(E, repo, 'BR', A, 'Alpha version one');
+  const c1 = await repo.commit('A (v1) enters main');
+  const v2 = entityText({ id: allocation.id, name: 'Alpha version two' });
+  await repo.write(A, v2);
+  const c2 = await repo.commit('A (v2)');
+  const blob = await repo.git('rev-parse', `${c1}:${A}`);
+  assert.notEqual(blob, await repo.git('rev-parse', `${c2}:${A}`), 'precondition: v1 and v2 are different blobs');
+  const oracle = await oracleFirstCanonical(repo, 'main', A, allocation.id);
+  assert.equal(oracle, c1, 'precondition: the undamaged repository says c1 is the first canonical commit');
+  const loose = path.join(repo.dir, '.git', 'objects', blob.slice(0, 2), blob.slice(2));
+  await fs.stat(loose); // the blob was written loose (no gc, no pack)
+  await fs.chmod(loose, 0o666).catch(() => {});
+  await fs.rm(loose, { force: true });
+  await assert.rejects(repo.git('cat-file', '-p', blob), 'precondition: git itself cannot read the deleted blob');
+  return { repo, dir: repo.dir, allocation, c1, c2, v2, blob };
+}

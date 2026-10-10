@@ -12,6 +12,12 @@
 // Round R01 remediation (audit .strike-team/phases/P002-id-registry/audits/AUDIT_R01.md, findings F01-F10)
 // added F-M1, F-M2, F-E14..F-E19, F-D14, F-B5 and the U+FF5E / U+1F600 tie pair. They were written from the
 // audit, PLAN.md and errata E-0001, E-0004, E-0007, E-0009..E-0016, E-0023, E-0024 without reading the engine.
+//
+// Round R02 remediation (audit .strike-team/phases/P002-id-registry/audits/AUDIT_R02.md, findings F01-F05)
+// restated F-D4 under E-0029 and added F-D15 (promotion only at the canonical tip), F-D16 (the R02 merge
+// regression), F-D17 (an unreadable blob fails closed), F-D18 (concurrent entity edits survive), F-M3 (E-0034
+// replay position) and F-E20 (two relocated copies). Written from the audit, PLAN.md and errata E-0009, E-0011,
+// E-0024, E-0028, E-0029, E-0034 only, without reading the engine.
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
@@ -28,8 +34,8 @@ import {
   writeRegistry,
 } from '../framework/conformance/p002-id-registry/scratch.mjs';
 import {
-  allocWrite, appendRegistryLine, buildE1, buildE1Promoted, buildE17, buildE2, buildE3, buildE5, buildFeature,
-  buildUnionPromote, buildUnionRenumber, dePath, makeBase, noopHistory, promote,
+  allocWrite, appendRegistryLine, buildBlobLoss, buildE1, buildE1Promoted, buildE17, buildE2, buildE3, buildE5,
+  buildFeature, buildMergeRegression, buildUnionPromote, buildUnionRenumber, dePath, makeBase, noopHistory, promote,
 } from '../framework/conformance/p002-id-registry/scenarios.mjs';
 
 const PENDING = false; // slice enforced (was 'P002 implementation pending')
@@ -71,6 +77,26 @@ async function rejectsWith(E, promise, code) {
   assert.ok(error instanceof E.IdRegistryError, 'instance of IdRegistryError');
   assert.equal(error.code, code, `error code (message: ${error.message})`);
   return error;
+}
+
+async function rejectsWithAny(E, promise, codes) {
+  let error = null;
+  try {
+    await promise;
+  } catch (caught) {
+    error = caught;
+  }
+  assert.ok(error, `expected rejection with one of ${codes.join(' | ')}`);
+  assert.equal(error.name, 'IdRegistryError', `error name (got ${error.name}: ${error.message})`);
+  assert.ok(error instanceof E.IdRegistryError, 'instance of IdRegistryError');
+  assert.ok(codes.includes(error.code), `error code ${error.code} is one of ${codes.join(' | ')} (message: ${error.message})`);
+  return error;
+}
+
+/** E-0029: the normal "not at the canonical tip" result (not an error). */
+function assertSkipped(result, label = '') {
+  assert.equal(result.skipped, 'not_canonical_tip', `${label} skipped`);
+  assert.deepEqual([result.promoted, result.renumbered, result.entities_rewritten], [[], [], []], `${label} nothing promoted, renumbered or rewritten`);
 }
 
 const sortBytes = (items) => [...items].sort((x, y) => Buffer.compare(Buffer.from(x), Buffer.from(y)));
@@ -699,6 +725,30 @@ check('F-M2', 'a non-identical conflicting promote, alias or move stays invalid 
   }
 });
 
+// Audit R02 F04, E-0034: the E-0024 (2) check is made at the alias's replay position.
+check('F-M3', 'E-0034: the permanent-renumber check is judged at the alias replay position', async (E) => {
+  for (const row of T.replay_position_valid) {
+    const dir = await tmpProject('m3v');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = fullRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    const registry = await E.readIdRegistry(dir).catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    assert.deepEqual(registry.events, parseRegistryText(text).events, `${row.name}: events read as written`);
+    const got = await E.allocateId(dir, 'BR', br('n'));
+    assert.equal(got.id, 'BR-0003', `${row.name}: the registry stays usable`);
+    assert.ok((await registryBytes(dir)).startsWith(text), `${row.name}: append-only`);
+  }
+  for (const row of T.replay_position_invalid) {
+    const dir = await tmpProject('m3i');
+    await fs.mkdir(path.join(dir, '.kf'));
+    const text = fullRegistry(row.lines);
+    await fs.writeFile(path.join(dir, ...REGISTRY_REL.split('/')), text);
+    await rejectsWith(E, E.readIdRegistry(dir), 'INVALID_REGISTRY').catch((error) => { error.message = `${row.name}: ${error.message}`; throw error; });
+    await rejectsWith(E, E.allocateId(dir, 'BR', br('y')), 'INVALID_REGISTRY');
+    assert.equal(await registryBytes(dir), text, `${row.name}: file unchanged`);
+  }
+});
+
 // ================================================================== Branches and promotion
 check('F-D1', 'non-canonical entity stays provisional', async (E) => {
   const ctx = await buildFeature(E, 'd1');
@@ -751,7 +801,9 @@ check('F-D3', 'canonicalBranch is explicit and never assumed', async (E) => {
   assert.equal(result.promoted[0].id, 'BR-0001');
 });
 
-check('F-D4', 'promotion is independent of the checked-out branch', async (E) => {
+// RESTATED under E-0029 (audit R02 F01): the PLAN statement "promotion from a feature checkout reads main's history
+// and promotes" (F-D4, V-33/V-35) is superseded. Only the canonical tip checkout promotes; elsewhere it is a no-op.
+check('F-D4', 'E-0029: a feature-branch checkout skips promotion and writes nothing; main promotes with its own history', async (E) => {
   const ctx = await buildFeature(E, 'd4');
   const { repo, dir } = ctx;
   await repo.checkout('main');
@@ -760,9 +812,15 @@ check('F-D4', 'promotion is independent of the checked-out branch', async (E) =>
   await repo.write('notes/readme.txt', 'later feature work\n');
   await repo.commit('c2 on feature');
   assert.notEqual(ctx.featureCommit, M);
+  const before = await snapshot(dir);
   const result = await promote(E, dir);
-  assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: M }]);
+  assertSkipped(result, 'feature checkout');
+  assert.deepEqual(await snapshot(dir), before, 'E-0029: registry, entities and .kf are byte-identical');
   assert.equal(await oracleFirstCanonical(repo, 'main', A, 'BR-0001'), M);
+  await repo.checkout('main');
+  const onMain = await promote(E, dir);
+  assert.equal(onMain.skipped, undefined, 'near-miss: the canonical tip checkout is not skipped');
+  assert.deepEqual(onMain.promoted, [{ id: 'BR-0001', path: A, commit: M }], 'main promotes with its own first-parent commit');
 });
 
 check('F-D5', 'first-parent semantics', async (E) => {
@@ -1024,6 +1082,278 @@ check('F-D14', '(d) replace refs do not alter the history the engine reads', asy
   await repo.git('replace', all[2], fake);
   assert.notDeepEqual(await repo.firstParent('main'), all, 'precondition: plain git sees the replacement');
   assert.deepEqual(await E.createGitHistoryReader(repo.dir).firstParentCommits('main'), all);
+});
+
+// Audit R02 F01, E-0029: promotion runs only when the commit of HEAD equals the commit the canonical branch
+// resolves to (E-0024 (4)); otherwise it is a normal result with skipped: 'not_canonical_tip' and writes nothing.
+check('F-D15', '(a) a feature-branch checkout never promotes, even when main holds colliders', async (E) => {
+  const ctx = await buildE1(E, 'd15a');
+  const { repo, dir, M1, M2 } = ctx;
+  await repo.checkout('side', { create: true });
+  await repo.write('notes/side.txt', 'side work\n');
+  assert.notEqual(await repo.commit('side work'), M2, 'precondition: HEAD is not the tip of main');
+  const before = await snapshot(dir);
+  const skipped = await promote(E, dir);
+  assertSkipped(skipped, 'feature checkout');
+  assert.deepEqual(await snapshot(dir), before, 'registry and entities are byte-identical');
+  assert.deepEqual(await lockLeftovers(dir), []);
+  // near-miss: the same repository with main checked out promotes and renumbers
+  await repo.checkout('main');
+  const done = await promote(E, dir);
+  assert.equal(done.skipped, undefined);
+  assert.deepEqual(done.promoted, [{ id: 'BR-0001', path: A, commit: M1 }]);
+  assert.deepEqual(done.renumbered, [{ from: 'BR-0001', to: 'BR-0002', path: B, commit: M2 }]);
+});
+
+check('F-D15', '(b) a detached HEAD at an older main commit skips', async (E) => {
+  const ctx = await buildE1(E, 'd15b');
+  const { repo, dir, M1, M2 } = ctx;
+  await repo.git('checkout', '-q', '--detach', M1);
+  assert.notEqual(await repo.head(), M2);
+  assert.equal(await repo.git('rev-parse', 'refs/heads/main'), M2, 'precondition: main itself is ahead');
+  const before = await snapshot(dir);
+  assertSkipped(await promote(E, dir), 'older main commit');
+  assert.deepEqual(await snapshot(dir), before, 'registry and entities are byte-identical');
+});
+
+check('F-D15', '(c) a detached HEAD exactly at the canonical tip promotes normally', async (E) => {
+  const ctx = await buildE1(E, 'd15c');
+  const { repo, dir, M1, M2 } = ctx;
+  await repo.git('checkout', '-q', '--detach', 'main');
+  assert.equal(await repo.head(), M2);
+  const evBefore = await registryEvents(dir);
+  const result = await promote(E, dir);
+  assert.equal(result.skipped, undefined);
+  assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: M1 }]);
+  assert.deepEqual(result.renumbered, [{ from: 'BR-0001', to: 'BR-0002', path: B, commit: M2 }]);
+  assert.deepEqual(result.entities_rewritten, [A, B]);
+  assert.deepEqual(await registryEvents(dir), [...evBefore,
+    promo('BR-0001', A, M1), alloc('BR-0002', B), aliasEv('BR-0001', 'BR-0002', M2)]);
+  assertProjection(await repo.read(A), ctx.origA, { id: 'BR-0001', id_status: 'permanent', id_alias: null });
+  assertProjection(await repo.read(B), ctx.origB, { id: 'BR-0002', id_status: 'provisional', id_alias: ['BR-0001'] });
+});
+
+check('F-D15', '(d) a clone with only refs/remotes/origin/main: detached older commit skips, detached at it promotes', async (E) => {
+  const origin = await buildE1(E, 'd15o');
+  const { M1, M2 } = origin;
+  const cloneDir = await tmpProject('d15d');
+  await run('git', ['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'clone', '-q', pathToFileURL(origin.dir).href, cloneDir]);
+  const clone = new Repo(cloneDir);
+  await clone.git('config', 'core.autocrlf', 'false');
+  await clone.git('config', 'core.eol', 'lf');
+  await clone.git('checkout', '-q', '--detach');
+  await clone.git('branch', '-D', 'main');
+  assert.equal(await clone.git('branch', '--list', 'main'), '', 'precondition: no local main');
+  assert.equal(await clone.git('rev-parse', 'refs/remotes/origin/main'), M2, 'precondition: the remote-tracking branch is the tip');
+
+  await clone.git('checkout', '-q', '--detach', M1);
+  const before = await snapshot(cloneDir);
+  assertSkipped(await promote(E, cloneDir), 'older origin/main commit');
+  assert.deepEqual(await snapshot(cloneDir), before, 'registry and entities are byte-identical');
+
+  await clone.git('checkout', '-q', '--detach', 'refs/remotes/origin/main');
+  assert.equal(await clone.head(), M2);
+  const evBefore = await registryEvents(cloneDir);
+  const result = await promote(E, cloneDir);
+  assert.equal(result.skipped, undefined);
+  assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: M1 }]);
+  assert.deepEqual(result.renumbered, [{ from: 'BR-0001', to: 'BR-0002', path: B, commit: M2 }]);
+  assert.deepEqual(await registryEvents(cloneDir), [...evBefore,
+    promo('BR-0001', A, M1), alloc('BR-0002', B), aliasEv('BR-0001', 'BR-0002', M2)]);
+});
+
+// Audit R02 F01 reproduction (p1.mjs): promotion on f2, then on main, then merge f2. With E-0029 the registry
+// never contains two different promote (or renumber) facts for one ID.
+check('F-D16', 'promote on f2 (skipped), then on main, then merge f2: the registry stays valid and writable', async (E) => {
+  const ctx = await buildMergeRegression(E, 'd16');
+  const { repo, dir, M1, M2 } = ctx;
+  assert.equal(await repo.git('rev-parse', '--abbrev-ref', 'HEAD'), 'f2');
+  assert.equal(ctx.deAllocation.id, 'DE-0001');
+  const before = await snapshot(dir);
+  assertSkipped(await promote(E, dir), 'f2');
+  assert.deepEqual(await snapshot(dir), before, 'f2 is untouched');
+
+  await repo.checkout('main');
+  const onMain = await promote(E, dir);
+  assert.deepEqual(onMain.promoted, [{ id: 'BR-0001', path: A, commit: M1 }]);
+  assert.deepEqual(onMain.renumbered, [{ from: 'BR-0001', to: 'BR-0002', path: B, commit: M2 }]);
+  const P = await repo.commit('promotion result on main');
+  await repo.mergeNoFf('f2', 'merge f2'); // clean: registry union, entity B only changed on main
+
+  const text = await registryBytes(dir);
+  assert.ok(!/^(<<<<<<<|=======|>>>>>>>)/m.test(text), 'no conflict markers');
+  const registry = await E.readIdRegistry(dir); // R02 F01: used to throw INVALID_REGISTRY "promoted twice"
+  assert.deepEqual(registry.events.filter((e) => e.op === 'promote'), [promo('BR-0001', A, M1)], 'exactly one promote of BR-0001');
+  assert.equal(eventLines(text).filter((line) => line.includes('op: promote')).length, 1, 'one physical promote line');
+  assert.ok(registry.events.some((e) => e.op === 'allocate' && e.id === 'DE-0001'), 'the allocation made on f2 survived the merge');
+  assert.deepEqual((await E.checkIdCollisions(dir)).diagnostics, []);
+  // the registry is still usable: the renumbered BR-0002 (entered main with the promotion result) is promoted
+  const later = await promote(E, dir);
+  assert.equal(later.skipped, undefined);
+  assert.deepEqual(later.promoted, [{ id: 'BR-0002', path: B, commit: P }]);
+  assert.deepEqual(later.diagnostics, []);
+});
+
+// E-0035 (2): the optional headCommit() of the history reader gives the checkout's HEAD; without it the reader is
+// treated as positioned at the canonical tip (so the injected-history cases above stay as written).
+check('F-D19', 'an injected reader with headCommit(): different from the last first-parent commit skips, equal promotes', async (E) => {
+  const sha = (n) => `${'c'.repeat(39)}${n}`;
+  const commits = [1, 2, 3, 4].map(sha);
+  const reader = (head) => ({
+    firstParentCommits: async () => commits,
+    headCommit: async () => head,
+    readFile: async (commit, p) => (p === A && commit >= sha(2) ? entityText({ id: 'BR-0001', name: 'Alpha' }) : null),
+  });
+  const dir = await seededProject([SEED, alloc('BR-0001', A)], 'd19');
+  await writeEntity(dir, A, { id: 'BR-0001', name: 'Alpha' });
+  const before = await snapshot(dir);
+  for (const head of [sha(3), sha(1), sha(9)]) {
+    assertSkipped(await E.promoteIds(dir, { canonicalBranch: 'main', history: reader(head) }), `headCommit ${head}`);
+    assert.deepEqual(await snapshot(dir), before, 'registry and entities are byte-identical');
+  }
+  const result = await E.promoteIds(dir, { canonicalBranch: 'main', history: reader(sha(4)) });
+  assert.equal(result.skipped, undefined, 'headCommit equals the last first-parent commit');
+  assert.deepEqual(result.promoted, [{ id: 'BR-0001', path: A, commit: sha(2) }]);
+  assert.deepEqual(result.entities_rewritten, [A]);
+});
+
+// Audit R02 F02: an object-read failure is not "the path is absent".
+check('F-D17', '(a) the default reader fails closed on a missing blob; absent paths still read as null', async (E) => {
+  const ctx = await buildBlobLoss(E, 'd17a');
+  const { repo, dir, c1, c2, v2 } = ctx;
+  assert.equal((await run('git', ['rev-parse', '--is-shallow-repository'], { cwd: dir })).trim(), 'false', 'precondition: not shallow');
+  const reader = E.createGitHistoryReader(dir);
+  await rejectsWithAny(E, reader.readFile(c1, A), ['GIT_FAILED', 'HISTORY_INCOMPLETE']);
+  // near-misses: genuinely absent paths / readable blobs
+  assert.equal(await reader.readFile(c1, 'no/such/file.yaml'), null, 'path absent from an existing commit');
+  assert.equal(await reader.readFile(repo.b0, A), null, 'A is absent from B0');
+  assert.equal(await reader.readFile(c2, A), v2, 'the v2 blob is intact');
+  assert.deepEqual(await reader.firstParentCommits('main'), [repo.b0, c1, c2]);
+});
+
+check('F-D17', '(b) promoteIds at the canonical tip fails closed and mutates nothing', async (E) => {
+  const ctx = await buildBlobLoss(E, 'd17b');
+  const { repo, dir } = ctx;
+  assert.equal(await repo.git('rev-parse', 'HEAD'), await repo.git('rev-parse', 'refs/heads/main'), 'precondition: at the tip');
+  const before = await snapshot(dir);
+  await rejectsWithAny(E, promote(E, dir), ['GIT_FAILED', 'HISTORY_INCOMPLETE']);
+  assert.deepEqual(await snapshot(dir), before, 'registry, entity, tmp files and lock all as before');
+  assert.deepEqual(await registryEvents(dir), [SEED, alloc('BR-0001', A)], 'no promote event with the wrong (later) commit');
+});
+
+// Audit R02 F03: a concurrent edit to an entity file is never discarded by the rewrite.
+const EDIT_LINE = 'reviewer_note: edited while promotion ran';
+
+async function appendEdit(dir, rel) {
+  await fs.appendFile(path.join(dir, ...rel.split('/')), `${EDIT_LINE}\n`);
+}
+
+/** Default Git reader whose readFile appends the edit to `target` the first time that path is read. */
+function racingHistory(E, dir, target) {
+  const real = E.createGitHistoryReader(dir);
+  const state = { fired: false };
+  return {
+    state,
+    history: {
+      firstParentCommits: (branch) => real.firstParentCommits(branch),
+      readFile: async (commit, p) => {
+        if (!state.fired && p === target) {
+          state.fired = true;
+          await appendEdit(dir, target);
+        }
+        return real.readFile(commit, p);
+      },
+    },
+  };
+}
+
+/** Injected rename that appends the edit to `target` just before the registry is renamed into place. */
+function racingRename(dir, target) {
+  const state = { fired: false };
+  return {
+    state,
+    rename: async (from, to) => {
+      if (!state.fired && path.basename(to) === 'id-registry.yaml') {
+        state.fired = true;
+        await appendEdit(dir, target);
+      }
+      return fs.rename(from, to);
+    },
+  };
+}
+
+/**
+ * First call: the edit line is still in the file, and the file is either rewritten (identity keys only, edit kept)
+ * or byte-identical to the edited text. Second call: converged to `expected` with the edit kept. Third: idempotent.
+ * E-0035 (3): a file not rewritten because its bytes changed is listed in entities_skipped (else []).
+ */
+async function assertEditSurvives(E, { repo, dir, target, edited, expected, first }) {
+  const afterFirst = await repo.read(target);
+  assert.ok(afterFirst.split('\n').includes(EDIT_LINE), 'the concurrent edit is still in the file after the first call');
+  if (first.entities_rewritten.includes(target)) {
+    assertProjection(afterFirst, edited, expected);
+    assert.deepEqual(first.entities_skipped, [], 'E-0035 (3): nothing skipped when the file was rewritten');
+  } else {
+    assert.equal(afterFirst, edited, 'a file not listed as rewritten is byte-identical to the edited text');
+    assert.deepEqual(first.entities_skipped, [target], 'E-0035 (3): the held-back file is listed in entities_skipped');
+  }
+  const second = await promote(E, dir);
+  assert.equal(second.skipped, undefined);
+  assert.deepEqual(second.entities_skipped, [], 'E-0035 (3): the converging call skips nothing');
+  assert.deepEqual(second.diagnostics, []);
+  assertProjection(await repo.read(target), edited, expected);
+  const frozen = { registry: await registryBytes(dir), entity: await repo.read(target) };
+  const third = await promote(E, dir);
+  assert.deepEqual([third.promoted, third.renumbered, third.entities_rewritten], [[], [], []], 'converged: idempotent');
+  assert.equal(await registryBytes(dir), frozen.registry);
+  assert.equal(await repo.read(target), frozen.entity);
+}
+
+async function mainWithFeatureA(E, label) {
+  const ctx = await buildFeature(E, label);
+  await ctx.repo.checkout('main');
+  await ctx.repo.mergeNoFf('feature', 'M');
+  return { ...ctx, edited: `${ctx.origA}${EDIT_LINE}\n` };
+}
+
+check('F-D18', '(a) an edit made while history.readFile runs is preserved; the next call converges', async (E) => {
+  const ctx = await mainWithFeatureA(E, 'd18a');
+  const { repo, dir, edited } = ctx;
+  const { history, state } = racingHistory(E, dir, A);
+  const first = await promote(E, dir, { history });
+  assert.ok(state.fired, 'precondition: the injected edit ran');
+  assert.equal(first.skipped, undefined);
+  await assertEditSurvives(E, { repo, dir, target: A, edited, first, expected: { id: 'BR-0001', id_status: 'permanent', id_alias: null } });
+  assert.equal((await registryEvents(dir)).filter((e) => e.op === 'promote').length, 1, 'one promote event overall');
+});
+
+check('F-D18', '(b) an edit made just before the registry rename is preserved; the next call converges', async (E) => {
+  const ctx = await mainWithFeatureA(E, 'd18b');
+  const { repo, dir, edited } = ctx;
+  const { rename, state } = racingRename(dir, A);
+  const first = await promote(E, dir, { rename });
+  assert.ok(state.fired, 'precondition: the injected edit ran');
+  await assertEditSurvives(E, { repo, dir, target: A, edited, first, expected: { id: 'BR-0001', id_status: 'permanent', id_alias: null } });
+  assert.equal((await registryEvents(dir)).filter((e) => e.op === 'promote').length, 1, 'one promote event overall');
+});
+
+check('F-D18', '(c) only the edited file is held back: the other entity is rewritten, the renumbered one converges with its edit', async (E) => {
+  const ctx = await buildE1(E, 'd18c');
+  const { repo, dir } = ctx;
+  const editedB = `${ctx.origB}${EDIT_LINE}\n`;
+  const { history, state } = racingHistory(E, dir, B);
+  const first = await promote(E, dir, { history });
+  assert.ok(state.fired, 'precondition: the injected edit ran');
+  assert.deepEqual(first.diagnostics, []);
+  assert.ok(first.entities_rewritten.includes(A), 'the unedited file is rewritten normally');
+  assertProjection(await repo.read(A), ctx.origA, { id: 'BR-0001', id_status: 'permanent', id_alias: null });
+  await assertEditSurvives(E, {
+    repo, dir, target: B, edited: editedB, first, expected: { id: 'BR-0002', id_status: 'provisional', id_alias: ['BR-0001'] },
+  });
+  const events = await registryEvents(dir);
+  assert.equal(events.filter((e) => e.op === 'promote' && e.id === 'BR-0001').length, 1, 'one promote of BR-0001');
+  assert.equal(events.filter((e) => e.op === 'allocate' && e.id === 'BR-0002').length, 1, 'BR-0002 allocated once');
+  assert.equal(events.filter((e) => e.op === 'alias').length, 1, 'one renumbering');
 });
 
 // ================================================================== Collisions and renumbering
@@ -1516,6 +1846,43 @@ check('F-E19', 'unregistered is sorted by id first, then by path', async (E) => 
     { id: 'CHG-0009', path: 'changes/CHG-0009.yaml' },
   ]);
   assert.deepEqual(report.diagnostics, []);
+});
+
+// Audit R02 F05, E-0024 (3): "otherwise the unique file carrying Y whose path equals no path of any allocate Y
+// event; otherwise none".
+check('F-E20', 'two relocated copies of the renumbered ID: no id_alias until exactly one remains', async (E) => {
+  const ctx = await buildE1Promoted(E, 'e20');
+  const { dir, repo } = ctx;
+  const R1 = br('relocated-1');
+  const R2 = br('relocated-2');
+  const bare = entityText({ id: 'BR-0002', name: 'Beta' }); // BR-0002, provisional, no id_alias
+  assert.deepEqual(YAML.parse(await repo.read(B)).id_alias, ['BR-0001'], 'precondition: B was renumbered by the promotion');
+  await repo.remove(B); // the entity left its anchor path ...
+  await repo.write(R1, bare); // ... and exists twice, at paths that equal no allocate BR-0002 path (uncommitted)
+  await repo.write(R2, bare);
+  const eventsBefore = await registryEvents(dir);
+  assert.ok(!eventsBefore.some((e) => e.op === 'allocate' && e.id === 'BR-0002' && [R1, R2].includes(e.path)));
+  const report = await E.checkIdCollisions(dir);
+  assert.deepEqual(report.provisional_collisions, [{ id: 'BR-0002', paths: [R1, R2] }], 'precondition: two holders');
+  const before = await snapshot(dir);
+  const none = await promote(E, dir);
+  assert.equal(none.skipped, undefined, 'main is checked out at its tip');
+  assert.deepEqual([none.promoted, none.renumbered, none.entities_rewritten, none.diagnostics], [[], [], [], []],
+    'no unique relocated holder: neither copy gets id_alias, nothing is promoted');
+  assert.deepEqual(await snapshot(dir), before, 'no event written, no file rewritten');
+  assert.equal(await repo.read(R1), bare);
+  assert.equal(await repo.read(R2), bare);
+
+  // one copy is deleted and the rest is committed: the unique survivor is the renumbered entity
+  await repo.remove(R2);
+  const P2 = await repo.commit('survivor committed');
+  assert.equal(await oracleFirstCanonical(repo, 'main', R1, 'BR-0002'), P2);
+  const done = await promote(E, dir);
+  assert.equal(done.skipped, undefined);
+  assert.deepEqual(done.promoted, [{ id: 'BR-0002', path: R1, commit: P2 }]);
+  assert.deepEqual([done.renumbered, done.diagnostics, done.entities_rewritten], [[], [], [R1]]);
+  assert.deepEqual(await registryEvents(dir), [...eventsBefore, promo('BR-0002', R1, P2)]);
+  assertProjection(await repo.read(R1), bare, { id: 'BR-0002', id_status: 'permanent', id_alias: ['BR-0001'] });
 });
 
 // ================================================================== Resolution
