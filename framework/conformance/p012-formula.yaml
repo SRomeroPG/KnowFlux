@@ -1,0 +1,157 @@
+# P012 Formula Logic - independently stated conformance slice (spec section 55, l.2103:
+# "El fixture es la definicion operativa de terminado").
+#
+# Written by the conformance engineer BEFORE any P012 implementer code was read (framework/engine/formula.mjs and
+# decimal-ops.mjs did not exist), at base commit c10ae95d828847c79589535b1bb31c0fd7153242, from:
+#   .strike-team/phases/P012-formula-logic/PLAN.md (incl. "Foreman decisions after planning"), TRIAGE.md,
+#   knowledge-framework-spec-v2.1.md (l.576-635, 640-663, 1600, 1765-1771, 1953-1956, 2075-2103),
+#   knowledge-framework-spec-v2.1-errata.md (E-0008, E-0017..E-0022, E-0025..E-0027, E-0030..E-0033, E-0036).
+# Runner: test/conformance-p012-formula.test.mjs (engine API phase; there is no kf binary and no
+# framework/conformance/expected/ runner yet - P028 ports this slice). Vectors and builders:
+# framework/conformance/p012-formula/ (units-uf0/uf1/uf2.yaml, rounding.yaml, decimal-ops.yaml, cases.mjs, cases-w.mjs,
+# builders.mjs, exec.mjs, spec-example.mjs, determinism-child.mjs).
+#
+# P012 adds NO section-55 entities and no expected/ command line (PLAN "Fixture slice"): acme-formulation and spec-examples
+# are never changed, DIV is never populated by hand. The worked example of l.640-653 is loaded from the frozen spec file.
+# Decisions in force: E-0036 (1) KF-E-316 node is unknown, no cascade, output check skipped; (2) semantic protection
+# criterion for KF-E-313; (3) significant digits counted on the normalized coefficient (10^32 / 1 is exact).
+schema_version: 2.1
+phase: P012
+status: pending-implementation
+base_commit: c10ae95d828847c79589535b1bb31c0fd7153242
+
+# Every key of case_index has at least one test whose title starts with the key, and every test key is indexed
+# (checked by the runner, test "F-INDEX"). cites = spec line / errata entry / PLAN target the expectation comes from.
+# status: pending-decision = no assertion is made (named test.todo); see DECISION_NEEDED in the engineer's report.
+case_index:
+  # ----------------------------------------------------------------------------------------------------- operators
+  F-O1: {targets: [V-01], cites: ["spec l.582", "spec l.656", "E-0017", "E-0033 (arity)"], expect: "add exact (0.1+0.2=0.3, 2^53+1), never -0, left fold, one argument canonical, quantity keeps unit"}
+  F-O2: {targets: [V-01], cites: ["spec l.582", "E-0033 (subtract: exactly 2)"], expect: "subtract exact; arity 0/1/3 is INVALID_EXPRESSION"}
+  F-O3: {targets: [V-01], cites: ["spec l.582", "E-0033", "E-0030 (3)"], expect: "multiply exact incl. 30-digit product; -0*5 = 0; fold; quantity*decimal keeps unit"}
+  F-O4: {targets: [V-02], cites: ["E-0032 (3)", "E-0033 (divide: exactly 2)", "spec l.585"], expect: "exact quotients at default precision 28 incl. 2^40 (28 digits), constant nonzero divisors; arity"}
+  F-O5: {targets: [V-03], cites: ["E-0033 (min/max: one or more)", "spec l.660"], expect: "numeric min/max, fold, one argument, quantities, arity 0 invalid"}
+  F-O6: {targets: [V-03], cites: ["E-0030 (5)", "E-0033 (abs: exactly 1)"], expect: "abs keeps unit, never -0, arity"}
+  F-O7: {targets: [V-03], cites: ["E-0033 (clamp: exactly 3, runtime lo > hi INVALID_RANGE)"], expect: "inclusive clamp; lo>hi check clean + evaluation INVALID_RANGE; arity 2/4"}
+  F-O8: {targets: [V-03], cites: ["spec l.662", "E-0017"], expect: "ref/const leaves at the root, canonical form"}
+  # ----------------------------------------------------------------------------------------------- structure and errors
+  F-X1: {targets: [V-04, V-38], cites: ["spec l.616", "spec l.638", "E-0033", "PLAN P-10"], expect: "every malformed logic/node/output/guards/raise is INVALID_EXPRESSION from check and evaluate alike"}
+  F-X1b: {targets: [V-04], cites: ["PLAN P-10", "E-0031 (2)"], expect: "near-miss: OUT-0011, OUT-123456, OUT-9999 accepted"}
+  F-X2: {targets: [V-05], cites: ["spec l.583", "E-0017"], expect: "non-string/off-pattern const and supplied values are INVALID_DECIMAL; valid forms accepted"}
+  F-X3: {targets: [V-05], cites: ["spec l.589", "spec l.591", "E-0018"], expect: "undeclared const/output/input/guard-literal unit and bare percent are UNKNOWN_UNIT; declared units accepted"}
+  F-X4: {targets: [V-06], cites: ["E-0019", "E-0027 (2)", "E-0031 (1)"], expect: "UNBOUND_FIELD / AMBIGUOUS_FIELD for refs, guard keys, conditions, supplied keys; full ref binds"}
+  F-X5: {targets: [V-06], cites: ["E-0031 (1)", "E-0019"], expect: "enum/string/boolean as operand is TYPE_MISMATCH; accepted as guard keys; predicate misuse and supplied type errors"}
+  F-X6: {targets: [V-16], cites: ["E-0019", "E-0022 D-03", "E-0031 (2)", "PLAN N-A"], expect: "EMPTY_PREDICATE in guards and if conditions"}
+  F-X7: {targets: [V-16], cites: ["E-0019", "E-0033 (INVALID_RANGE)"], expect: "between min>max INVALID_RANGE; between 1..5 and 1..1 accepted"}
+  F-X8: {targets: [V-16], cites: ["E-0021", "E-0031 (1)"], expect: "UNSUPPORTED_INPUT_TYPE / INVALID_INPUT_DECLARATION in options.inputs"}
+  # ------------------------------------------------------------------------------------------------------- options
+  F-B1: {targets: [V-07, V-38], cites: ["PLAN P-08", "E-0018"], expect: "unitRegistry missing/null/raw/hand-made and options missing/null are INVALID_ARGUMENT from both functions"}
+  F-B2: {targets: [V-07], cites: ["PLAN P-08", "E-0031 (1)"], expect: "inputs not an array INVALID_ARGUMENT; [] with a ref UNBOUND_FIELD; [] with no refs fine"}
+  F-B3: {targets: [V-07], cites: ["PLAN P-08", "spec l.1955", "E-0032 (6)"], expect: "precision 0,-1,1.5,'28',NaN,null,Infinity INVALID_ARGUMENT; absent/1/100 accepted; DEFAULT_PRECISION 28, MAX_EXPRESSION_DEPTH 1000"}
+  F-B4: {targets: [V-07], cites: ["PLAN P-08"], expect: "values null/list/string INVALID_ARGUMENT"}
+  F-B5: {targets: [V-06], cites: ["E-0019", "E-0022 D-02"], expect: "suffix binding equals full-ref binding"}
+  # --------------------------------------------------------------------------------------------------- unit algebra
+  F-U1: {targets: [V-08], cites: ["spec l.591", "spec l.660", "E-0030 (2)"], expect: "add/subtract/min/max: KF-E-310 source expression at /expression/args/<i> with expected/found unit text, one per offender; same-id near-misses clean"}
+  F-U2: {targets: [V-08], cites: ["spec l.660", "E-0030 (2)"], expect: "clamp: all three operands identical unit id"}
+  F-U3: {targets: [V-09], cites: ["spec l.660", "E-0030 (2)"], expect: "if branches identical; else is the offender (/expression/else, /else/else)"}
+  F-U4: {targets: [V-10], cites: ["spec l.661", "spec l.662", "E-0030 (3)"], expect: "admissible multiply/divide (dimensionless, one registered unit, cancellation, {ratio:1}) give no finding"}
+  F-U5: {targets: [V-08], cites: ["spec l.662", "E-0030 (1)"], expect: "unitless const is dimensionless; {ratio:1} differs from {}"}
+  F-U6: {targets: [V-11], cites: ["spec l.661", "spec l.1771", "E-0030 (3)", "E-0036 (1)"], expect: "KF-E-316 on the multiply/divide node with operation and unit text; no unit looked up by name or dimension (UF2)"}
+  F-U6b: {targets: [V-11, V-29], cites: ["E-0036 (1)", "E-0037 (2)", "PLAN D-01 option 1"], expect: "unknown unit: no cascade in parents, unknown operands ignored and first known operand is the reference, output check skipped, independent defects still reported"}
+  F-U7: {targets: [V-12], cites: ["spec l.663", "E-0030 (4)"], expect: "output check by id; dimensionless output needs a registered dimension:dimensionless unit; UF0/UF1/UF2 matrix; UNKNOWN_UNIT outputs"}
+  F-U8: {targets: [V-13], cites: ["E-0030 (5)"], expect: "abs/round/min/max/clamp keep the unit"}
+  F-U9: {targets: [V-13], cites: ["E-0030 (5)", "spec l.657"], expect: "static check covers the unselected if branch, ERR when evaluated"}
+  # --------------------------------------------------------------------------------------------- spec example (loaded)
+  F-W0: {targets: [V-14], cites: ["spec l.640-653", "PLAN F-W"], expect: "example loaded from the frozen spec: fences at l.640/l.653, logic mapping content"}
+  F-W1: {targets: [V-14], cites: ["spec l.641-652", "spec l.660-663", "E-0030"], expect: "W checks clean"}
+  F-W2: {targets: [V-14, V-19], cites: ["spec l.584", "spec l.641-652", "E-0032 (2)"], expect: "3.7800 / 3.9900 / 2.1000 / 4.2000 / 8.4000 / 0.0000 / 0.0002 percent_mass, exactly 4 decimals"}
+  F-W3: {targets: [V-14, V-19], cites: ["spec l.650-652", "E-0031 (2)"], expect: "f>=1 raises OUT-0011 @0, also with c absent"}
+  F-W4: {targets: [V-14, V-19], cites: ["spec l.606-607", "E-0031 (4)"], expect: "any absent/null operand -> ok null"}
+  F-W5: {targets: [V-14, V-18], cites: ["spec l.584", "E-0032 (2)"], expect: "ties and signs for half-even/half-up/down/up at 4 decimals; never -0.0000"}
+  F-W6: {targets: [V-14, V-24], cites: ["E-0025 (3)", "E-0027 (3)", "E-0031 (1)"], expect: "supplied-value KF-E-310 (source value, /inputs/<i>) before guards; INVALID_DECIMAL for numbers"}
+  F-W7: {targets: [V-14, V-06], cites: ["E-0019", "E-0022 D-02"], expect: "suffix-keyed supplied values give 3.7800"}
+  F-W8: {targets: [V-14], cites: ["spec l.584", "spec l.585", "spec l.660-663", "E-0032 (4)"], expect: "mutations: add->KF-E-310, output ppm->KF-E-310, furlong/percent->UNKNOWN_UNIT, raise OUT-11->INVALID_EXPRESSION, divide(1,f) KF-E-313 unless guard lte 0, no rounding block -> 3.78"}
+  # ------------------------------------------------------------------------------------------------------- guards
+  F-G1: {targets: [V-15], cites: ["E-0031 (2)", "spec l.650-652"], expect: "document order, first true guard wins, guard_index"}
+  F-G2: {targets: [V-15], cites: ["E-0031 (2)"], expect: "guards precede the expression"}
+  F-G3: {targets: [V-15], cites: ["PLAN P-03", "E-0031 (2)"], expect: "raised result shape; null expression with a true guard is still raised"}
+  F-G4: {targets: [V-16], cites: ["E-0019", "E-0031 (1)", "spec l.606-607"], expect: "guard predicates over enum/string/boolean/quantity/decimal, combinators, binary null logic"}
+  F-G5: {targets: [V-16], cites: ["spec l.589", "spec l.608", "spec l.612", "E-0033"], expect: "static KF-E-310/314/315 with exact guard pointers; evaluation blocked; near-misses clean"}
+  F-G6: {targets: [V-16], cites: ["E-0031 (2)"], expect: "guards absent == []; OUT-9999 accepted"}
+  # ----------------------------------------------------------------------------------------------------------- if
+  F-I1: {targets: [V-17], cites: ["spec l.607", "spec l.656", "E-0031 (3)"], expect: "if selection; null cond is false -> else"}
+  F-I2: {targets: [V-17], cites: ["E-0031 (3)"], expect: "laziness: unselected branch (runtime INVALID_RANGE) never evaluated"}
+  F-I3: {targets: [V-17], cites: ["spec l.606-607", "E-0031 (3)", "E-0031 (4)"], expect: "null conditions, null is not zero, selected null branch is null"}
+  F-I4: {targets: [V-17], cites: ["E-0030 (5)", "E-0031 (3)", "E-0032 (5)"], expect: "both branches checked statically; cond findings KF-E-310/314/315 at /expression/cond/..."}
+  F-I5: {targets: [V-17], cites: ["E-0019", "E-0033"], expect: "cond {} / all [] EMPTY_PREDICATE; unbound key; no else INVALID_EXPRESSION"}
+  F-I6: {targets: [V-17], cites: ["E-0030 (2)"], expect: "nested if selection and separate unit identity per if"}
+  # ------------------------------------------------------------------------------------------------------------ null
+  F-L1: {targets: [V-20], cites: ["spec l.606", "E-0031 (4)"], expect: "every operation with an absent operand is ok null; null divisor is null (not 313, not raised)"}
+  F-L2: {targets: [V-20], cites: ["spec l.606"], expect: "null is not zero nor the other operand"}
+  F-L3: {targets: [V-20], cites: ["spec l.606", "E-0031 (4)"], expect: "explicit null equals absent"}
+  F-L4: {targets: [V-20], cites: ["E-0031 (4)", "PLAN P-03"], expect: "null value shape; rounding of null is null"}
+  F-L5: {targets: [V-20], cites: ["spec l.607"], expect: "guards on null are false"}
+  # ------------------------------------------------------------------------------------------------------ rounding
+  F-R1: {targets: [V-21], cites: ["spec l.584", "E-0032 (2)"], expect: "decimals 0 table, four modes, ties, signs, zero"}
+  F-R1b: {targets: [V-21], cites: ["E-0032 (2)"], expect: "decimals 1 table"}
+  F-R2: {targets: [V-21], cites: ["spec l.584", "E-0032 (2)"], expect: "decimals 2 table incl. negative ties and -0.00"}
+  F-R3: {targets: [V-22], cites: ["E-0032 (2)"], expect: "exactly decimals fraction digits, no cap (30, 100), 30-digit integer ties"}
+  F-R4: {targets: [V-22], cites: ["spec l.584"], expect: "no rounding block: nothing rounded, canonical form"}
+  F-R5: {targets: [V-22], cites: ["E-0032 (1)"], expect: "intermediates exact, one final rounding"}
+  F-R6: {targets: [V-22], cites: ["E-0032 (1)"], expect: "round operator rounds at that point, final rounding still applies; no block -> INVALID_EXPRESSION"}
+  F-R7: {targets: [V-22], cites: ["spec l.584", "E-0032 (2)", "E-0033"], expect: "rounding block validation (modes, decimals integer >= 0); accepted 0/30/100"}
+  # ------------------------------------------------------------------------------------------------------- division
+  F-V2: {targets: [V-23], cites: ["E-0032 (3)", "spec l.584"], expect: "no block + inexact: INEXACT_DIVISION on evaluation, check clean; 28/29-digit boundary; precision 27/29"}
+  F-V3: {targets: [V-23], cites: ["E-0032 (3)"], expect: "inexact with block: precision rounding by declared mode then final rounding"}
+  F-V4: {targets: [V-23], cites: ["E-0032 (3)"], expect: "rounding twice observable (precision 3; default 28 with decimals 30)"}
+  F-V5: {targets: [V-23], cites: ["E-0032 (3)"], expect: "double rounding differs from single (0.12 not 0.13)"}
+  F-V6: {targets: [V-23], cites: ["E-0032 (2)", "E-0032 (3)"], expect: "exact tie in the 28-digit rounding of 1/2^41: even kept for half-even/down, away for half-up/up"}
+  F-V7: {targets: [V-23], cites: ["E-0032 (2)"], expect: "signs of significant-digit rounding"}
+  F-V8: {targets: [V-23], cites: ["E-0032 (3)"], expect: "precision 1"}
+  F-V9: {targets: [V-23], cites: ["E-0036 (3)"], expect: "10^32 / 1 is exact (trailing zeros not significant), with and without rounding; 33 significant digits stays inexact"}
+  F-V10: {targets: [V-23], cites: ["spec l.582"], expect: "300-digit multiply/add/subtract equal a BigInt reference"}
+  # --------------------------------------------------------------------------------------------- KF-E-313 protection
+  F-Za: {targets: [V-25], cites: ["E-0032 (4a)"], expect: "nonzero constant divisors protected"}
+  F-Zb: {targets: [V-25], cites: ["E-0032 (4b)", "E-0036 (2)"], expect: "guards true at zero on the bare-ref divisor protect (all listed forms, quantities, index 1)"}
+  F-Zc: {targets: [V-25], cites: ["E-0032 (4c)", "E-0036 (2)"], expect: "if conditions protect the then (false at zero) or else (true at zero) branch, at any depth"}
+  F-Zn1: {targets: [V-26], cites: ["E-0032 (4)", "spec l.1768"], expect: "no guard / guards [] -> KF-E-313 unprotected"}
+  F-Zn2: {targets: [V-26], cites: ["E-0032 (4b)"], expect: "guard on another field does not protect"}
+  F-Zn3: {targets: [V-26], cites: ["E-0032 (4b)", "E-0036 (2)"], expect: "guards not true at zero do not protect (14 forms + quantity)"}
+  F-Zn4: {targets: [V-26], cites: ["E-0036 (2)"], expect: "predicates that mention another field never protect"}
+  F-Zn5: {targets: [V-26], cites: ["E-0032 (4)"], expect: "compound divisors are KF-E-313 with input null even with a covering guard"}
+  F-Zn6: {targets: [V-26], cites: ["E-0032 (4)"], expect: "constant zero divisor is never protected (reason zero_constant), also inside a protective if"}
+  F-Zn7: {targets: [V-26], cites: ["E-0032 (4c)", "E-0036 (2)"], expect: "wrong branch / wrong condition / other field / two keys"}
+  F-Zn8: {targets: [V-26], cites: ["E-0032 (4)"], expect: "two divisions judged independently, pointers /expression/args/<i>"}
+  F-Zx: {targets: [V-26], cites: ["E-0036 (2)", "PLAN D-02 option 2"], expect: "sound extras (lt 1, gt -1, ne 5, not_in 5, is_null false, any eq0|eq1; then gt 1 ...; else lt 1 ...) protect"}
+  F-Zp1: {targets: [V-26], cites: ["E-0037 (1)", "E-0036 (2)"], expect: "guard {all: [{gain: {eq: '0'}}]} protects (supersedes PLAN F-Zn4); check clean, raises on 0, value, null"}
+  F-Zp2: {targets: [V-26], cites: ["E-0037 (1)", "E-0036 (2)"], expect: "guard {not: {gain: {ne: '0'}}} protects (supersedes PLAN F-Zn4); check clean, raises on 0 and on absent g (binary logic), value"}
+  F-Zr: {targets: [V-25], cites: ["E-0031 (2)", "E-0031 (4)", "E-0032 (4)"], expect: "runtime of protected divisions (raise on zero, value, null, if-protected, quantities)"}
+  F-Zs: {targets: [V-27], cites: ["E-0032 (5)"], expect: "static findings block evaluation; a zero divisor is never reached (ERR, never DIVISION_BY_ZERO)"}
+  F-Zd: {targets: [V-27], cites: ["spec l.1600", "spec l.1768", "PLAN diagnostic fields"], expect: "KF-E-313 shape: pointer, reason, input, remediation, rule null"}
+  # ------------------------------------------------------------------------------------------ ordering and shape
+  F-T1: {targets: [V-27, V-28], cites: ["E-0032 (5)", "PLAN P-07"], expect: "one formula per code: evaluate returns ERR with the check list; bad supplied value + finding yields ERR, not INVALID_DECIMAL"}
+  F-T2: {targets: [V-24, V-28], cites: ["E-0031 (1)", "E-0025 (3)", "E-0027 (3)"], expect: "supplied-value KF-E-314/310 even when unread; null/absent/in-domain fine; two findings sorted (310 then 314)"}
+  F-K1: {targets: [V-29], cites: ["spec l.1765-1771", "E-0033"], expect: "positive + near-miss per code; only the five phase codes"}
+  F-S1: {targets: [V-29], cites: ["PLAN F-S1", "PLAN Diagnostic sort key"], expect: "four codes in one formula in exact (code, pointer) order"}
+  F-S1b: {targets: [V-29], cites: ["E-0036 (1)"], expect: "S1 plus KF-E-316 sorted last; add keeps first-operand unit so the output check still runs"}
+  F-S2a: {targets: [V-30], cites: ["PLAN design: determinism"], expect: "key order of every mapping never changes a result (all cases, 3 permutations)"}
+  F-S2b: {targets: [V-30], cites: ["PLAN F-S2"], expect: "fresh child process gives byte-identical JSON"}
+  F-S3: {targets: [V-31], cites: ["PLAN F-S3"], expect: "frozen and unfrozen arguments never mutated; fresh outputs"}
+  F-S4: {targets: [V-29, V-38], cites: ["PLAN routing rule", "spec l.1600"], expect: "no KF- code thrown, no typed code in diagnostics, shape fields"}
+  F-S5: {targets: [V-32], cites: ["spec l.1765-1771", "PLAN P-02", "E-0036"], expect: "FORMULA_DIAGNOSTIC_CATALOG, FORMULA_ERROR_CODES, P011 constants unchanged"}
+  # ------------------------------------------------------------------------------------------------------ decimal-ops
+  F-M1: {targets: [V-33], cites: ["PLAN decimal-ops API"], expect: "absDecimal values and INVALID_ARGUMENT"}
+  F-M2: {targets: [V-33], cites: ["E-0032 (2)"], expect: "roundDecimal tables, scale === decimals, argument validation"}
+  F-M3: {targets: [V-33], cites: ["E-0032 (3)"], expect: "roundDecimalSignificant vectors, digits validation"}
+  F-M4: {targets: [V-33], cites: ["E-0032 (3)", "E-0032 (5)", "E-0036 (3)"], expect: "divideDecimal exact flag, modes, DIVISION_BY_ZERO, INVALID_ARGUMENT"}
+  F-M5: {targets: [V-33], cites: ["PLAN decimal-ops API"], expect: "formatDecimalFixed exactly scale digits, never -0"}
+  # ------------------------------------------------------------------------------------------------------ depth, size
+  F-N1: {targets: [V-34], cites: ["E-0032 (6)", "PLAN N-07"], expect: "500 nested evaluates; 1100 INVALID_EXPRESSION, no RangeError (add and if chains)"}
+  F-N2: {targets: [V-34], cites: ["E-0033", "PLAN N2"], expect: "5000-argument add/min/max"}
+  F-N3: {targets: [V-34], cites: ["spec l.582", "PLAN N3"], expect: "2000-digit multiply and 5000-digit round trip within 5 s"}
+  # -------------------------------------------------------------------------------------------- P011 non-regression
+  F-E1: {targets: [V-35], cites: ["PLAN F-E1"], expect: "no expected/, acme, spec-examples, schemas, bin, package.json, eslint change (opt-in git status gate KF_P012_BOUNDARY=1)"}
+  F-E2a: {targets: [V-35], cites: ["PLAN F-E2", "PLAN P-01", "PLAN P-02"], expect: "decimal/units/regex-re2 and every P011 test/fixture byte-identical to c10ae95"}
+  F-E2b: {targets: [V-35], cites: ["PLAN F-E2", "PLAN P-02"], expect: "decision-table/logic-diagnostics/logic-errors differ only by added lines; exports superset; four + two + one appended exports present"}
+  F-E2c: {targets: [V-35], cites: ["PLAN F-E2"], expect: "P011 suites pass with the counts 172, 10, 7, 22, 69"}
+  F-P1: {targets: [V-36], cites: ["PLAN F-P1"], expect: "sibling imports only, no dynamic import"}
+  F-P2: {targets: [V-36], cites: ["spec l.582", "spec l.612", "spec l.638", "PLAN F-P2"], expect: "no float, clock, randomness, I/O, eval, host RegExp in the new/edited modules"}

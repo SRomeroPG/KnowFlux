@@ -1,0 +1,8 @@
+# Registry UF1 (PLAN "Notation") = UF0 plus a registered dimensionless unit (E-0030 (4): `dimension: dimensionless`).
+units:
+  - {id: percent_mass, dimension: mass_fraction, symbol: "% m/m"}
+  - {id: ppm_mass, dimension: mass_fraction, symbol: "ppm"}
+  - {id: percent_volume, dimension: volume_fraction, symbol: "% v/v"}
+  - {id: kg, dimension: mass, symbol: "kg"}
+  - {id: ratio, dimension: dimensionless, symbol: "1"}
+conversions: []

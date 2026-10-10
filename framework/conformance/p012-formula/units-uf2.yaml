@@ -1,0 +1,12 @@
+# Registry UF2 (PLAN "Notation") = UF1 plus a second dimensionless unit and a unit for the squared dimension.
+# `percent_mass_squared` exists but must NEVER be looked up by name or dimension for multiply(percent_mass, percent_mass)
+# (E-0030 (3): the engine never invents or converts a unit; identity is by id, l.591).
+units:
+  - {id: percent_mass, dimension: mass_fraction, symbol: "% m/m"}
+  - {id: ppm_mass, dimension: mass_fraction, symbol: "ppm"}
+  - {id: percent_volume, dimension: volume_fraction, symbol: "% v/v"}
+  - {id: kg, dimension: mass, symbol: "kg"}
+  - {id: ratio, dimension: dimensionless, symbol: "1"}
+  - {id: pct_dimless, dimension: dimensionless, symbol: "%"}
+  - {id: percent_mass_squared, dimension: mass_fraction_squared, symbol: "(% m/m)^2"}
+conversions: []

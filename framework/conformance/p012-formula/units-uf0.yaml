@@ -1,0 +1,8 @@
+# Registry UF0 (PLAN "Notation") = P011's U1. Shape of spec l.596-599; conversions empty in v1 (l.599).
+# No dimensionless unit is declared and bare `percent` is NOT declared (l.591; E-0018: no built-in unit).
+units:
+  - {id: percent_mass, dimension: mass_fraction, symbol: "% m/m"}
+  - {id: ppm_mass, dimension: mass_fraction, symbol: "ppm"}
+  - {id: percent_volume, dimension: volume_fraction, symbol: "% v/v"}
+  - {id: kg, dimension: mass, symbol: "kg"}
+conversions: []
