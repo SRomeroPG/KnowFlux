@@ -183,3 +183,6 @@ cython_debug/
 # KnowFlux local Node tooling
 node_modules/
 coverage/
+
+# E-0007: registry lock directories are never committed
+.kf/*.lock/

@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# E-0007: registry is append-only; union merge surfaces duplicate allocations deterministically
+.kf/id-registry.yaml merge=union
