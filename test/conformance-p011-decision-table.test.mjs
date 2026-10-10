@@ -943,6 +943,25 @@ check('F-Q12', 'a quantity literal on an enum, string or boolean input is a stat
   assert.deepEqual(ck(S1(['b'], { flag: true })), []);
 });
 
+// AUDIT R02 T02 (E-0025 (3)): a boolean (and any other non-quantity) literal on a quantity input is a static KF-E-310
+// with found_unit null, one diagnostic per offending literal node (PLAN: pointer = the offending literal node, so
+// each list element has its own pointer, as in F-Q5), sorted by the PLAN sort key (pointer byte order).
+check('F-Q15', 'boolean and bare literals on a quantity input are static KF-E-310 with found_unit null, one per literal node (E-0025 (3); AUDIT R02 T02; V-20)', () => {
+  const lit = (pointer) => q310(pointer, null);
+  const base = '/rules/0/when/concentration';
+  const cases = [
+    [{ concentration: true }, [lit(base)]],
+    [{ concentration: { eq: false } }, [lit(`${base}/eq`)]],
+    [{ concentration: { lt: true } }, [lit(`${base}/lt`)]],
+    [{ concentration: { in: ['X', true] } }, [lit(`${base}/in/0`), lit(`${base}/in/1`)]],
+    [{ concentration: { between: [true, '1'] } }, [lit(`${base}/between/0`), lit(`${base}/between/1`)]],
+  ];
+  for (const [W, expected] of cases) expectDiags(ck(S1(QIN, W)), expected, JSON.stringify(W));
+  // near-miss: only the quantity element of a mixed list is clean
+  expectDiags(ck(S1(QIN, { concentration: { in: [Q('1', 'pm'), true] } })), [lit(`${base}/in/1`)]);
+  assert.deepEqual(ck(S1(QIN, { concentration: { between: [Q('1', 'pm'), Q('2', 'pm')] } })), []);
+});
+
 check('F-Q13', 'a supplied string, boolean or enum value for a quantity input is KF-E-310 with found_unit null (E-0025 (3); AUDIT F04; V-21)', () => {
   const t = S1(QIN, { concentration: { lte: Q('4.2', 'pm') } });
   for (const supplied of ['abc', 'X', 'true', true, false, '4.2']) {
@@ -1392,6 +1411,20 @@ check('F-V6d', 'a value set against a closed bound overlaps at the shared value 
     expectDiags(ck(pair(NON_ENUM, w1, w2)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], `pair ${i} ${JSON.stringify([w1, w2])}`);
     expectDiags(ck(pair(NON_ENUM, w2, w1)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], `pair ${i} swapped`);
   });
+});
+
+// AUDIT R02 T01 (E-0020 (b)): equal-value degenerate between against an open or a closed bound at that value.
+check('F-V6f', 'between [5,5] against gt / lt at 5 is disjoint; against gte / lte at 5 overlaps (l.625, l.633; E-0020 (b); AUDIT R02 T01; V-32)', () => {
+  const bt = { count: { between: ['5', '5'] } };
+  const overlap = [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })];
+  for (const op of ['gt', 'lt']) {
+    assert.deepEqual(ck(pair(NON_ENUM, bt, { count: { [op]: '5' } })), [], `between [5,5] vs ${op} 5`);
+    assert.deepEqual(ck(pair(NON_ENUM, { count: { [op]: '5' } }, bt)), [], `${op} 5 vs between [5,5]`);
+  }
+  for (const op of ['gte', 'lte']) {
+    expectDiags(ck(pair(NON_ENUM, bt, { count: { [op]: '5' } })), overlap, `between [5,5] vs ${op} 5`);
+    expectDiags(ck(pair(NON_ENUM, { count: { [op]: '5' } }, bt)), overlap, `${op} 5 vs between [5,5]`);
+  }
 });
 
 check('F-V6e', 'a value set against an open bound that excludes every member is provably disjoint (l.633; E-0020; AUDIT F07; V-32)', () => {

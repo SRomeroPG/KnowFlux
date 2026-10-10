@@ -194,3 +194,6 @@ case_index:
   F-V10b: {targets: [V-31, V-33], cites: ["spec l.607", "E-0025 (1)", "AUDIT_R01 F03"], expect: "near-misses clean (eq, ne, not vs X, not-null vs null); beyond the limit the proof falls back and fails closed"}
   F-S6: {targets: [V-35], cites: ["PLAN sort key", "AUDIT_R01 F08"], expect: "evaluation diagnostics sorted by code: [KF-E-310, KF-E-314] though the enum input comes first"}
   F-S7: {targets: [V-35], cites: ["PLAN sort key", "AUDIT_R01 F08"], expect: "same-code evaluation diagnostics ordered by pointer in byte order: /inputs/10 before /inputs/2"}
+  # ---- Round R02 test gaps (AUDIT R02 T01, T02)
+  F-Q15: {targets: [V-20], cites: ["E-0025 (3)", "E-0019", "AUDIT_R02 T02"], expect: "boolean / bare literals on a quantity input: static KF-E-310 found_unit null source literal, one per literal node (eq, lt, in elements 0 and 1, between elements 0 and 1)"}
+  F-V6f: {targets: [V-32], cites: ["spec l.625", "spec l.633", "E-0020 (b)", "AUDIT_R02 T01"], expect: "between [5,5] vs gt 5 and lt 5: disjoint; vs gte 5 and lte 5: KF-E-312 not_proven_disjoint; both orders"}
