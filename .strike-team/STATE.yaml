@@ -28,11 +28,11 @@ phases:
     audit_round: 3
     accepted_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
   P002:
-    status: IMPLEMENTING
+    status: READY_FOR_AUDIT
     track: A
     depends_on: [P001]
     plan: .strike-team/phases/P002-id-registry/PLAN.md
-    last_product_commit: 0dddf47efccff4a97fc643fbcbfebfb3e4c52f6c
+    last_product_commit: 6e5ac168c31a883e2c90832b61f75c9ea9f86a16
     audit_round: 0
     accepted_audit: null
   P003:
@@ -251,7 +251,7 @@ foreman:
   last_run: 2026-10-10
   consecutive_failed_rounds: 0
 
-pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021, E-0022]
+pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021, E-0022, E-0023]
 open_decisions: [E-0006]
 open_spec_gaps: []
 

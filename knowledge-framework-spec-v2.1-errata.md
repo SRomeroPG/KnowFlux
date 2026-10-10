@@ -34,6 +34,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0020 | Hit policies, `default`, overlap proof, exhaustiveness proof | DECIDED_BY_FOREMAN | LOW | P011, P014 |
 | E-0021 | RE2 dialect in a Node engine; outputs and uncatalogued failures | DECIDED_BY_FOREMAN | LOW | P011, P012, P013, P014 |
 | E-0022 | Decision-table details from P011 planning (amends E-0019 on `when: {}`) | DECIDED_BY_FOREMAN | LOW | P011, P012, P014 |
+| E-0023 | P002 implementation details: cross-ID renumber order, ambiguous result fields, stale-lock break | DECIDED_BY_FOREMAN | MEDIUM | P002 |
 
 ---
 
@@ -633,3 +634,23 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P011 planning)
 **Ratified**: pending
 **Affects.** P011, P012, P014.
+
+---
+
+## E-0023 — P002 implementation details: cross-ID renumber order, ambiguous result fields, stale-lock break
+
+**Clauses**
+- l.317: "El engine renumera el de `first_canonical_commit` posterior y registra `id_alias`."
+- l.304: "con lock transaccional"; E-0013, E-0015 D-02(c), E-0016.
+
+**Question.** Points the P002 implementer met that E-0013/E-0015/E-0016 leave open: (1) order of fresh-ID assignment when losers of *different* colliding IDs are renumbered in one promotion call; (2) the remaining fields of an `ambiguous` `resolveId` result; (3) how to break a stale lock without removing a lock acquired after staleness was judged.
+
+**Options considered.** (1a) by colliding ID ascending in byte order, then the E-0002/E-0009 order within each ID; (1b) one global order by (first-parent index, path). (2a) `id: null, path: null, via: [], warnings: []`; (2b) `via: [input]`. (3a) rename the lock directory directly; (3b) first claim the owner file by an in-directory rename, verify its bytes equal the owner judged stale (restore and abort otherwise), then rename the directory away and remove it.
+
+**Decision.** (1a), consistent with D-02(c), which already orders `promote` events by ID. (2a). (3b): it satisfies E-0013's single-winner requirement without the race in (3a); a breaker that dies mid-way leaves an owner-less lock, handled by E-0015 D-04 (manual removal).
+
+**Reversibility.** LOW for (2) and (3); MEDIUM for (1) (persisted event order).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 R01)
+**Ratified**: pending
+**Affects.** P002.

@@ -39,3 +39,11 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 
 - P002: conformance slice committed 5fce77d (63 todo cases, written at 8d73627 before implementer code). kf-implementer R01 briefed (running).
 - P011: kf-phase-planner (sonnet) wrote PLAN (40 targets), TRIAGE, TRACEABILITY. Planner raised D-01..D-08; decided as E-0022, which amends E-0019: top-level `when: {}` is an unconditional non-default row (the accepted P001 schema and fixture use it). P011 PLANNED -> IMPLEMENTING as secondary; its implementer will run in a worktree.
+
+## 2026-10-10 P002 implement R01 -> READY_FOR_AUDIT
+
+- kf-implementer (sonnet) R01: engine rewritten (id-registry.mjs + 5 helpers), `id_alias` schema field, 55 unit tests. DECISION_NEEDED DN-1/DN-2 and the stale-lock break mechanism decided as E-0023.
+- Conformance engineer flipped PENDING; slice enforced: 64/64.
+- Foreman verification at 6e5ac16: build ok (19 schemas), lint ok on framework/scripts/test (see incident below), npm test 413 tests, 265 pass, 0 fail, 148 todo (P011), git diff --check clean, boundaries ok.
+- Product commit 6e5ac16 `P002 implement ID registry engine`.
+- Incident (infra, ADVISORY): `npm run lint` (`eslint .`) scans agent worktrees under `.claude/worktrees/`, where the globals block does not apply, giving 24 spurious errors while a worktree exists; `.claude/worktrees/` is also untracked-but-not-ignored. Fix through an implementer round that is authorized to touch eslint config and `.gitignore` (add ignores for `.claude/worktrees/`). Until then the Foreman lints `framework scripts test eslint.config.js` explicitly.
