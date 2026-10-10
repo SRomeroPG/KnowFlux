@@ -5,13 +5,14 @@ import { hasControlCharacter } from './id-registry-codec.mjs';
 import { IdRegistryError } from './id-registry-errors.mjs';
 
 const MAX_BUFFER = 512 * 1024 * 1024;
-const ENVIRONMENT_DROP = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_COMMON_DIR', 'GIT_NAMESPACE'];
+const ENVIRONMENT_DROP = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_COMMON_DIR', 'GIT_NAMESPACE', 'GIT_GRAFT_FILE', 'GIT_REPLACE_REF_BASE'];
 
 function git(cwd, args) {
-  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' };
+  // Replace refs and grafts must not alter the history the engine reads (E-0024 (4)): identical on every clone.
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C', GIT_NO_REPLACE_OBJECTS: '1' };
   for (const name of ENVIRONMENT_DROP) delete env[name];
   return new Promise((resolve) => {
-    execFile('git', args, { cwd, env, encoding: 'buffer', maxBuffer: MAX_BUFFER, windowsHide: true }, (error, stdout, stderr) => {
+    execFile('git', ['--no-replace-objects', ...args], { cwd, env, encoding: 'buffer', maxBuffer: MAX_BUFFER, windowsHide: true }, (error, stdout, stderr) => {
       resolve({
         status: error ? (typeof error.code === 'number' ? error.code : -1) : 0,
         errorCode: error && typeof error.code === 'string' ? error.code : null,
@@ -33,6 +34,26 @@ function unresolved(branch) {
 }
 
 /**
+ * E-0024 (4): the canonical branch is resolved only as a branch, `refs/heads/<name>` first and then
+ * `refs/remotes/origin/<name>`. Tags, revision expressions, reflog syntax and invalid ref names are unresolved.
+ */
+async function resolveBranch(cwd, branch) {
+  if (typeof branch !== 'string' || branch === '' || branch.startsWith('-') || hasControlCharacter(branch) || branch.includes('@{')) {
+    throw unresolved(branch);
+  }
+  const format = await git(cwd, ['check-ref-format', '--branch', branch]);
+  if (format.errorCode === 'ENOENT' || format.status < 0) throw failed('check-ref-format', format);
+  // --branch also expands `@{-N}`; only a name that comes back unchanged is a plain branch name
+  if (format.status !== 0 || format.stdout.toString('utf8').trim() !== branch) throw unresolved(branch);
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
+    const verify = await git(cwd, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+    if (verify.status === 0) return verify.stdout.toString('utf8').trim();
+    if (verify.errorCode === 'ENOENT' || verify.status < 0 || verify.stderr.trim() !== '') throw failed('rev-parse', verify);
+  }
+  throw unresolved(branch);
+}
+
+/**
  * Reader backed by the git executable, rooted at `projectRoot` (paths are resolved relative to it).
  * firstParentCommits(branch): `git rev-list --first-parent --reverse` of the commit the branch resolves to.
  * readFile(commit, repoPath): UTF-8 text of the file at that commit, null if absent.
@@ -41,15 +62,7 @@ export function createGitHistoryReader(projectRoot) {
   const cwd = path.resolve(projectRoot);
   return {
     async firstParentCommits(branch) {
-      if (typeof branch !== 'string' || branch === '' || branch.startsWith('-') || hasControlCharacter(branch)) {
-        throw unresolved(branch);
-      }
-      const verify = await git(cwd, ['rev-parse', '--verify', '--quiet', `${branch}^{commit}`]);
-      if (verify.status !== 0) {
-        if (verify.errorCode === 'ENOENT' || verify.status < 0 || verify.stderr.trim() !== '') throw failed('rev-parse', verify);
-        throw unresolved(branch);
-      }
-      const tip = verify.stdout.toString('utf8').trim();
+      const tip = await resolveBranch(cwd, branch);
       const shallow = await git(cwd, ['rev-parse', '--is-shallow-repository']);
       if (shallow.status !== 0) throw failed('rev-parse --is-shallow-repository', shallow);
       if (shallow.stdout.toString('utf8').trim() === 'true') {

@@ -151,9 +151,13 @@ export function parseRegistryText(text) {
   return { registry, model: buildModel(events) };
 }
 
-/** Replay model (order-tolerant where a union merge can reorder lines, E-0012). Throws INVALID_REGISTRY. */
+/**
+ * Replay model (order-tolerant where a union merge can reorder lines, E-0012). Throws INVALID_REGISTRY.
+ * Exact repeats of a `promote`, `alias` or `move` event are no-ops (E-0024 (1)); every non-identical conflict is invalid.
+ */
 export function buildModel(events) {
   const allocates = new Map(); // id -> [{index, path}]
+  const allocatePaths = new Map(); // id -> Set(path)
   const seen = new Set();
   const promotes = new Map(); // id -> {path, commit, index}
   const max = new Map(); // prefix -> bigint
@@ -166,11 +170,18 @@ export function buildModel(events) {
   for (const [index, event] of events.entries()) {
     for (const key of event.op === 'alias' ? ['from', 'to'] : ['id']) if (key in event) touch(event[key]);
     if (event.op === 'allocate') {
-      if (!allocates.has(event.id)) allocates.set(event.id, []);
+      if (!allocates.has(event.id)) {
+        allocates.set(event.id, []);
+        allocatePaths.set(event.id, new Set());
+      }
       allocates.get(event.id).push({ index, path: event.path });
+      allocatePaths.get(event.id).add(event.path);
     } else if (event.op === 'promote') {
-      if (promotes.has(event.id)) throw invalid(`event ${index}: ${event.id} is promoted twice`);
-      promotes.set(event.id, { path: event.path, commit: event.commit, index });
+      const earlier = promotes.get(event.id);
+      if (earlier === undefined) promotes.set(event.id, { path: event.path, commit: event.commit, index });
+      else if (earlier.path !== event.path || earlier.commit !== event.commit) {
+        throw invalid(`event ${index}: ${event.id} is promoted twice with different content`);
+      }
     }
   }
   for (const [index, event] of events.entries()) {
@@ -182,31 +193,55 @@ export function buildModel(events) {
     }
   }
   const holder = new Map([...promotes].map(([id, record]) => [id, record.path]));
+  const movesSeen = new Set();
   for (const [index, event] of events.entries()) {
     if (event.op !== 'move') continue;
     if (!holder.has(event.id)) throw invalid(`event ${index}: move of ${event.id}, which has no promote`);
-    if (holder.get(event.id) !== event.from) throw invalid(`event ${index}: move.from is not the current path of ${event.id}`);
-    holder.set(event.id, event.to);
+    const key = `${event.id}\u0000${event.from}\u0000${event.to}`;
+    if (holder.get(event.id) === event.from) {
+      holder.set(event.id, event.to);
+    } else if (!movesSeen.has(key)) {
+      throw invalid(`event ${index}: move.from is not the current path of ${event.id}`);
+    }
+    movesSeen.add(key);
   }
   const aliases = [];
   const aliasesFrom = new Map();
   const aliasesTo = new Map();
+  const aliasCommit = new Map(); // from NUL to -> commit
+  const aliasAnchorTarget = new Map(); // from NUL anchor -> to
   for (const [index, event] of events.entries()) {
     if (event.op !== 'alias') continue;
-    const list = allocates.get(event.to);
-    // The renumbered entity is the file at the path of the allocate of `to` written by the same renumbering:
-    // the nearest one before the alias line (D-02c puts it immediately before), else the nearest one after.
-    const before = list.filter((a) => a.index < index).at(-1);
-    const rpath = (before ?? list.find((a) => a.index > index)).path;
-    const alias = { index, from: event.from, to: event.to, commit: event.commit, rpath };
+    const pair = `${event.from}\u0000${event.to}`;
+    if (aliasCommit.has(pair)) {
+      if (aliasCommit.get(pair) !== event.commit) throw invalid(`event ${index}: alias ${event.from} -> ${event.to} repeated with a different commit`);
+      continue; // exact repeat (E-0024 (1))
+    }
+    aliasCommit.set(pair, event.commit);
+    // The renumbered entity is the file at the path of the nearest allocate of `to` that precedes the alias line
+    // (D-02c writes them adjacently; a union merge keeps each side's relative order; E-0028 (1)).
+    const before = allocates.get(event.to).filter((a) => a.index < index).at(-1);
+    if (before === undefined) throw invalid(`event ${index}: alias ${event.from} -> ${event.to} has no preceding allocate of ${event.to}`);
+    const anchorKey = `${event.from}\u0000${before.path}`;
+    if (aliasAnchorTarget.has(anchorKey) && aliasAnchorTarget.get(anchorKey) !== event.to) {
+      throw invalid(`event ${index}: ${event.from} is renumbered twice at ${before.path}`);
+    }
+    aliasAnchorTarget.set(anchorKey, event.to);
+    const alias = { index, from: event.from, to: event.to, commit: event.commit, rpath: before.path };
     aliases.push(alias);
     if (!aliasesFrom.has(alias.from)) aliasesFrom.set(alias.from, []);
     if (!aliasesTo.has(alias.to)) aliasesTo.set(alias.to, []);
     aliasesFrom.get(alias.from).push(alias);
     aliasesTo.get(alias.to).push(alias);
   }
+  // l.318 / E-0024 (2): a permanent ID is never renumbered; the file holding it must not be the renumbered entity.
+  for (const alias of aliases) {
+    if (promotes.has(alias.from) && holder.get(alias.from) === alias.rpath) {
+      throw invalid(`event ${alias.index}: alias ${alias.from} -> ${alias.to} renumbers the permanent holder of ${alias.from} at ${alias.rpath}`);
+    }
+  }
   assertAcyclic(aliasesFrom);
-  return { events, allocates, seen, promotes, holder, aliases, aliasesFrom, aliasesTo, max };
+  return { events, allocates, allocatePaths, seen, promotes, holder, aliases, aliasesFrom, aliasesTo, max };
 }
 
 function assertAcyclic(aliasesFrom) {
@@ -221,17 +256,64 @@ function assertAcyclic(aliasesFrom) {
   for (const id of aliasesFrom.keys()) visit(id);
 }
 
-/** `id_alias` projection (E-0011, E-0016 2a): aliases whose renumbered entity is the file at `filePath`, oldest first. */
-export function aliasProjection(model, id, filePath) {
+function connectedIds(model, start, anchor) {
+  const ids = new Set([start]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const alias of model.aliases) {
+      if (alias.rpath !== anchor || ids.has(alias.from) === ids.has(alias.to)) continue;
+      ids.add(alias.from).add(alias.to);
+      grew = true;
+    }
+  }
+  return ids;
+}
+
+function forwardIds(model, start) {
+  const ids = new Set([start]);
+  for (const id of ids) for (const alias of model.aliasesFrom.get(id) ?? []) ids.add(alias.to);
+  return ids;
+}
+
+/**
+ * Current path of the entity renumbered by `alias` (E-0024 (3), anchor per E-0028 (1)), or null when the alias
+ * projects onto no file. `files` = [{path, id}] with the ID each entity file carries (or will carry).
+ */
+export function aliasCurrentPath(model, alias, files) {
+  const target = alias.to;
+  const promote = model.promotes.get(target);
+  if (promote) {
+    // Promoted for the renumbered entity (at the anchor, or after an unrecorded relocation): its holder path.
+    // Promoted for a different entity that had its own allocate of the same ID: no file.
+    return promote.path === alias.rpath || !model.allocatePaths.get(target).has(promote.path) ? model.holder.get(target) : null;
+  }
+  const atAnchor = connectedIds(model, target, alias.rpath);
+  if (files.some((file) => file.path === alias.rpath && atAnchor.has(file.id))) return alias.rpath;
+  const forward = forwardIds(model, target);
+  const relocated = files.filter((file) => forward.has(file.id) && !model.allocatePaths.get(target).has(file.path));
+  return relocated.length === 1 ? relocated[0].path : null;
+}
+
+/**
+ * `id_alias` projection (E-0011, E-0024 (3)): aliases whose renumbered entity currently lives at `filePath`,
+ * oldest first, recursing through earlier aliases of the same entity.
+ */
+export function aliasProjection(model, id, filePath, files) {
   const out = [];
-  const visit = (target) => {
+  const memo = new Map();
+  const currentPath = (alias) => {
+    if (!memo.has(alias)) memo.set(alias, aliasCurrentPath(model, alias, files));
+    return memo.get(alias);
+  };
+  // An earlier alias of the same entity is one that renumbered it in place (same anchor) or whose entity is also here.
+  const visit = (target, later) => {
     for (const alias of model.aliasesTo.get(target) ?? []) {
-      if (alias.rpath !== filePath) continue;
-      visit(alias.from);
+      if (currentPath(alias) !== filePath && !(later && alias.rpath === later.rpath)) continue;
+      visit(alias.from, alias);
       if (!out.includes(alias.from)) out.push(alias.from);
     }
   };
-  visit(id);
+  visit(id, null);
   return out;
 }
 

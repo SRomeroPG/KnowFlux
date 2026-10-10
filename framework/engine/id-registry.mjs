@@ -304,6 +304,7 @@ export async function promoteIds(projectRoot, options) {
     const added = [...promoteEvents, ...renumberEvents];
     const post = added.length > 0 ? buildModel([...model.events, ...added]) : model;
 
+    const files = items.map((item) => ({ path: item.path, id: plan.get(item.path) ?? item.eff }));
     const rewrites = [];
     for (const item of items) {
       const finalId = plan.get(item.path);
@@ -314,7 +315,7 @@ export async function promoteIds(projectRoot, options) {
       const desired = {
         id: finalId,
         id_status: holder ? 'permanent' : 'provisional',
-        id_alias: aliasProjection(post, finalId, item.path),
+        id_alias: aliasProjection(post, finalId, item.path, files),
       };
       if (sameIdentity(item, desired)) continue;
       const text = projectEntityText(item.text, desired);
