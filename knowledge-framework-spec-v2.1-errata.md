@@ -49,6 +49,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0035 | P002 R02 remediation readings: later promote at the anchor, tip check with injected readers, skipped entities | DECIDED_BY_FOREMAN | LOW | P002, P007 |
 | E-0036 | P012 planning details: `KF-E-316` cascade, protection criterion, significant digits | DECIDED_BY_FOREMAN | LOW | P012, P014 |
 | E-0037 | P012 conformance readings: nested protecting guards; identity among known units | DECIDED_BY_FOREMAN | LOW | P012 |
+| E-0038 | Formula evaluation order with nulls; depth counting | DECIDED_BY_FOREMAN | LOW | P012 |
 
 ---
 
@@ -1016,5 +1017,26 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 **Reversibility.** LOW.
 **Status.** DECIDED_BY_FOREMAN
 **Decided**: 2026-10-10 by Foreman (P012 conformance)
+**Ratified**: pending
+**Affects.** P012.
+
+---
+
+## E-0038 — Formula evaluation order with nulls; depth counting
+
+**Clauses**
+- l.606: "`null` **SHALL** significar "ausente", nunca "cero" ni "falso"."; E-0031 (4) (null propagation); E-0032 (3), (6); E-0033 (`clamp` `lo > hi` → `INVALID_RANGE`).
+
+**Question.** P012 audit R01 raised three points: (1) are operands evaluated before null propagation applies, so that `clamp(null, 2, 1)` is `INVALID_RANGE` and `add(null, divide(1, 3))` without rounding is `INEXACT_DIVISION`, or does null short-circuit? (2) How is expression depth counted for the limit of 1000? (3) What is `clamp` with a null `x` and `lo > hi`?
+
+**Decision.**
+1. **Eager evaluation.** All arguments of an operator are evaluated first, left to right, and only then does null propagation (E-0031 (4)) apply to the operator's result. A defect inside a sibling argument (`INEXACT_DIVISION`, `INVALID_RANGE`) is therefore raised even when another argument is null. `if` stays lazy (E-0031 (3)).
+   - Rationale: a defect in the formula is reported regardless of which data happen to be absent, which is deterministic and fails loudly.
+2. **Depth.** The root expression node has depth 1. A tree of depth 1000 is accepted; depth 1001 is `INVALID_EXPRESSION`.
+3. **`clamp` with null `x`.** It raises `INVALID_RANGE` when `lo` and `hi` are non-null and `lo > hi`, consistent with (1).
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 audit R01)
 **Ratified**: pending
 **Affects.** P012.

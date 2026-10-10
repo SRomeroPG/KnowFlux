@@ -113,3 +113,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Conformance slice 3936f12 (116 keys, 827 records); E-0037 decided (nested protecting guards; identity among known units).
 - kf-implementer R01: formula.mjs, decimal-ops.mjs, additive P011 exports (0 deletions; decimal/units/regex-re2 and all P011 tests byte-identical), 66 unit tests. Conformance enforced by the conformance engineer: 117/117 + F-E1 opt-in boundary gate passing.
 - Foreman at e5bc9f216f4638a715c4c260f37bbb2d6cd08a92: build ok, lint ok, npm test 798 (797 pass, 1 opt-in skip, 0 fail), diff --check clean. Product commit e5bc9f216f4638a715c4c260f37bbb2d6cd08a92.
+
+## 2026-10-10 P012 audit R01 -> CHANGES_REQUESTED
+
+- Auditors: algorithm-determinism (no REQUIRED; 60k BigInt differential, 150k KF-E-313 fuzz), spec-compliance (no REQUIRED), test-conformance (127 mutants; 7 test gaps).
+- REQUIRED: D01 LOW (sparse predicate array -> raw TypeError; Foreman reproduced), T01 HIGH (intermediate exactness untested), T02-T05 MEDIUM, T06-T07 LOW (test gaps). Product arithmetic and proofs found sound.
+- E-0038 decided (eager evaluation with nulls; depth root=1; clamp with null x).
+- Incident: the P012 test auditor ran `taskkill /F /IM node.exe`, which can kill concurrent agents' node processes. Future auditor briefs forbid process-wide kills.
