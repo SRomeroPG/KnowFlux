@@ -40,6 +40,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0026 | Literal `null` operands in `ne`, `in`, `not_in`; regex program size counts the final match | DECIDED_BY_FOREMAN | LOW | P011, P014 |
 | E-0027 | P011 remediation readings: instruction counting, exact-ref ambiguity, single `KF-E-310` | DECIDED_BY_FOREMAN | LOW | P011 |
 | E-0028 | P002 remediation readings: alias anchor, conflicting alias repeats, lock owner fields, PLAN wording | DECIDED_BY_FOREMAN | LOW | P002 |
+| E-0029 | Promotion runs only at the canonical tip | DECIDED_BY_FOREMAN | LOW | P002, P007 |
 
 ---
 
@@ -776,3 +777,32 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P002 R01 remediation)
 **Ratified**: pending
 **Affects.** P002.
+
+---
+
+## E-0029 — Promotion runs only at the canonical tip
+
+**Clauses**
+- l.308: "> **«An ID is permanent only after its first appearance on the canonical branch.»**"
+- l.316: "Al entrar al branch canónico, `kf validate` lo promueve a `permanent`."
+- l.318: "**Un ID `permanent` SHALL NOT ser renumerado jamás.**"
+- E-0001 (explicit canonical branch), E-0002 ("identical result on every clone"), E-0009, E-0024 (1), (4).
+
+**Question.** P002 audit R02 (A01): `promoteIds` run on a non-canonical checkout decides winners, losers and loser IDs from that branch's working tree and registry tail. Its `promote`/`alias` events can then contradict those computed on the canonical branch, and a union merge makes the registry invalid. Where may promotion run?
+
+**Options considered**
+1. Only when the checkout is the canonical tip; elsewhere promotion is an explicit no-op.
+2. Compute holders from the canonical tip tree regardless of checkout (still needs a rule for branch-local loser counters).
+3. Allow branch-local promotion and tolerate conflicting facts in replay (weakens fail-closed).
+
+**Decision.** Option 1. `promoteIds` writes registry events or rewrites entities only when the commit of the checkout's `HEAD` equals the commit the canonical branch name resolves to (E-0024 (4)). Otherwise it writes nothing and returns empty `promoted`, `renumbered` and `entities_rewritten` lists, with `skipped: 'not_canonical_tip'`. That is a normal result, not an error. `allocateId`, `checkIdCollisions` and `resolveId` are unaffected. P007 decides how `kf validate` reports the skip. This supersedes the PLAN statement (F-D4, V-34/V-35) that promotion from a feature-branch checkout reads `main`'s history and promotes.
+
+Residual risk: an uncommitted local allocation on a canonical-tip checkout can still make loser numbering differ from CI's. Such a divergence surfaces as `INVALID_REGISTRY` after merge (fail closed). It is recorded here, not prevented.
+
+**Rationale.** l.316 ties promotion to entry into the canonical branch. At the tip, every input to the decision is canonical history plus the committed registry, which is identical on every clone, so repeated runs produce byte-identical events that E-0024 (1) deduplicates.
+
+**Reversibility.** LOW (no format change; narrows when events are written).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 audit R02)
+**Ratified**: pending
+**Affects.** P002, P007.

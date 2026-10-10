@@ -81,3 +81,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Fresh kf-conformance-engineer: 21 case keys (13 red before fix); readings decided as E-0027. Committed as the cases commit.
 - Fresh kf-implementer (remediation): F01-F06, F11 fixed; F07-F10 unit tests added; 4 unit assertions restated per E-0025 (3) / E-0022 D-05 (accepted by Foreman). Product commit 0e8f741.
 - Foreman verification at 0e8f741: build ok, lint ok, npm test 585/585; R01 reproductions now: 4-level zero-width repeat compiles in 1 ms, 1200-range class pattern 4 ms, null-absent overlap reported statically with witness null.
+
+## 2026-10-10 P011 accepted R02
+
+- Re-audit R02: algorithm-determinism (F01-F11 FIXED; 33000-pattern old/new regex differential, 0 diffs) and test-conformance (~95 mutants; all R01 survivors and re-introduction mutants killed). One LOW test gap (T02, E-0025 (3) boolean literal on quantity input) fixed in round by the conformance engineer (023daae); product unchanged.
+- Foreman at 023daae: build ok, lint ok, npm test 587/587, TRACEABILITY references verified (102 title refs, 128 case ids).
+- Accepted product SHA 0e8f741. Scoreboard: §56 item 7 PARTIAL; phases 2/28. §55 lines unchanged (no CLI yet).
+- Next secondary on Track B: P012 (Formula Logic), eligible (depends on P011).
