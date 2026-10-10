@@ -46,6 +46,8 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0032 | Division, rounding, and the `KF-E-313` protection proof | DECIDED_BY_FOREMAN | LOW | P012, P014 |
 | E-0033 | Formula operator arity and diagnostics inventory | DECIDED_BY_FOREMAN | LOW | P012 |
 | E-0034 | Permanent-renumber invalidity is judged at the alias's replay position (amends E-0024 (2)) | DECIDED_BY_FOREMAN | LOW | P002 |
+| E-0035 | P002 R02 remediation readings: later promote at the anchor, tip check with injected readers, skipped entities | DECIDED_BY_FOREMAN | LOW | P002, P007 |
+| E-0036 | P012 planning details: `KF-E-316` cascade, protection criterion, significant digits | DECIDED_BY_FOREMAN | LOW | P012, P014 |
 
 ---
 
@@ -817,15 +819,15 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 ## E-0030 — Formula unit algebra and dimensionless values
 
 **Clauses**
-- l.589: "Unidad declarada distinta de unidad recibida es ERROR (`KF-E-310`)." l.590: "Esto incluye pares matemáticamente convertibles."
-- l.658-663: "`add`, `subtract`, `min`, `max`, `clamp`: todos los operandos **SHALL** tener unidad idéntica; el resultado la conserva." / "`multiply`, `divide`: el resultado combina dimensiones. Si la dimensión resultante no existe en `units.yaml` → `KF-E-316`." / "`const` sin unidad es adimensional." / "La unidad calculada **SHALL** coincidir con `output.unit` → `KF-E-310`."
+- l.589: "Unidad declarada distinta de unidad recibida es ERROR (`KF-E-310`)." l.591: "Esto incluye pares matemáticamente convertibles."
+- l.660-663: "`add`, `subtract`, `min`, `max`, `clamp`: todos los operandos **SHALL** tener unidad idéntica; el resultado la conserva." / "`multiply`, `divide`: el resultado combina dimensiones. Si la dimensión resultante no existe en `units.yaml` → `KF-E-316`." / "`const` sin unidad es adimensional." / "La unidad calculada **SHALL** coincidir con `output.unit` → `KF-E-310`."
 - l.596-597: `units: - {id, dimension, symbol}` (a dimension is an opaque name).
 
 **Question.** `units.yaml` gives each unit only an opaque `dimension` name. What does "combine dimensions" mean, which unit does a product or quotient have, is "unidad idéntica" by id or by dimension, and how is a dimensionless value represented and matched against `output.unit`? (P012 triage T-01, T-07, T-09, T-16)
 
 **Decision.**
 1. Every formula value carries a **unit monomial**: a map from unit id to a non-zero integer exponent. The empty monomial is dimensionless. A `const` without `unit`, and a ref declared `type: decimal`, are dimensionless. A `const` with `unit` (it must be registered, `UNKNOWN_UNIT`) and a ref declared `type: quantity, unit: u` carry `{u: 1}`.
-2. `add`, `subtract`, `min`, `max`, `clamp`, and the two branches of `if`, require identical monomials. Identity is by unit id, never by dimension (l.590). A mismatch is `KF-E-310`. The result keeps the monomial.
+2. `add`, `subtract`, `min`, `max`, `clamp`, and the two branches of `if`, require identical monomials. Identity is by unit id, never by dimension (l.591). A mismatch is `KF-E-310`. The result keeps the monomial.
 3. `multiply` and `divide` add or subtract exponents. The result is admissible only when its monomial is empty (dimensionless) or exactly one registered unit id with exponent 1. Any other result, such as `percent_mass²` or `ppm_mass/percent_mass`, has no unit in `units.yaml` and is `KF-E-316`, reported statically on that node. The engine never invents or converts a unit.
 4. Output check (l.663). If the computed monomial is `{u: 1}`, `output.unit` must equal `u`. If it is dimensionless, `output.unit` must name a registered unit whose `dimension` is the literal string `dimensionless`. Otherwise the result is `KF-E-310`.
 5. `abs` and `round` keep the monomial. Every unit check in this entry (`KF-E-310`, `KF-E-316`) is static, a function of the expression tree, the declared refs and the registry, and covers both branches of every `if`.
@@ -843,7 +845,7 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 ## E-0031 — Formula refs, guards, `if`, and nulls
 
 **Clauses**
-- l.644-652 (example: refs without type; `guards: - when: {DE-0017.loss_factor: {gte: "1"}}  raise: OUT-0011`).
+- l.641-652 (example: refs without type; `guards: - when: {DE-0017.loss_factor: {gte: "1"}}  raise: OUT-0011`).
 - l.657: "`if` toma `{cond: predicate, then: expr, else: expr}`."
 - l.606-607: "`null` **SHALL** significar "ausente", nunca "cero" ni "falso"." / "Toda comparación con un operando `null` evalúa a `false`, salvo `is_null`."
 - E-0019 (binding, predicate semantics), E-0022 D-01/D-02.
@@ -948,3 +950,51 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 **Decided**: 2026-10-10 by Foreman (P002 audit R02)
 **Ratified**: pending
 **Affects.** P002.
+
+---
+
+## E-0035 — P002 R02 remediation readings: later promote at the anchor, tip check with injected readers, skipped entities
+
+**Clauses**
+- l.318; E-0029; E-0034; E-0011 ("atomically per file").
+
+**Question.** Points raised while writing the P002 R02 remediation cases:
+1. Under E-0034's positional rule, a registry `allocate X A, allocate Y A, alias X→Y, promote X A` (the alias line precedes the promote) would become valid.
+2. E-0029's tip check is defined by Git `HEAD`, which does not exist when a caller injects a history reader without a repository.
+3. The name of the result field for files skipped because of a concurrent edit.
+
+**Decision.**
+1. E-0034 is narrowed. An `alias` X→Y is also invalid when a `promote` of X whose path equals the alias's anchor appears **later** in replay. A promotion is an engine-written identity fact for that path, so it contradicts the renumbering. Only later `move` events into the anchor are legitimate path reuse (E-0034's case).
+2. The history reader interface gains an optional `headCommit(): Promise<string>` (full SHA of the checkout's `HEAD`). The default reader always provides it, and the E-0029 check is `headCommit() === last(firstParentCommits(canonicalBranch))`. An injected reader without `headCommit` is treated as positioned at the canonical tip. This is an integration seam for tests and later phases; the CLI (P007) always uses the default reader.
+3. A file not rewritten because its bytes changed after the scan is listed in `entities_skipped: string[]` (repo-relative paths, ascending UTF-8 byte order). It converges on the next run.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 R02 remediation)
+**Ratified**: pending
+**Affects.** P002, P007.
+
+---
+
+## E-0036 — P012 planning details: `KF-E-316` cascade, protection criterion, significant digits
+
+**Clauses**
+- l.661: "Si la dimensión resultante no existe en `units.yaml` → `KF-E-316`." l.663 (output unit → `KF-E-310`).
+- l.585; E-0032 (3), (4).
+
+**Question.** Three points left open by E-0030 and E-0032 (P012 `TRIAGE.md` D-01..D-03): (1) what a `KF-E-316` node contributes to its parents and to the output check; (2) whether E-0032 (4)'s list of protecting forms is closed or illustrative; (3) how significant digits are counted for "exact quotient".
+
+**Decision.**
+1. A node that reports `KF-E-316` has an **unknown** unit. Parents that combine with an unknown unit report nothing further about it, and the output check is skipped when the computed unit is unknown. Each defect yields exactly one finding.
+2. The protection criterion of E-0032 (4) is **semantic**, and the listed forms are examples.
+   - A guard protects a division by a bare ref R when its `when` predicate mentions only R and evaluates to true at R = zero (the decimal `"0"`, or the zero quantity in R's unit).
+   - An `if` protects its `then` branch when `cond` mentions only R and evaluates to false at R = zero, and its `else` branch when `cond` evaluates to true at R = zero.
+   - The evaluation uses the formula's own predicate semantics (E-0031). Predicates that mention other fields never protect.
+3. Significant digits are counted on the normalized coefficient, with trailing zeros stripped: `10^32 / 1` is exact (1 significant digit).
+- Additionally: P012 extends P011 modules only additively (new exports appended; P011 constants, behavior and tests unchanged). E-0033's "gains the catalog rows" is satisfied by an appended formula catalog.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 planning)
+**Ratified**: pending
+**Affects.** P012, P014.

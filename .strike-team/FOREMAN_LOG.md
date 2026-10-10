@@ -95,3 +95,8 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - New REQUIRED: F01 MEDIUM promotion from a non-canonical checkout bricks the merged registry -> E-0029 (promotion only at the canonical tip); F02 MEDIUM git reader maps object-read failure to "absent"; F03 LOW concurrent entity edits lost; F04 LOW permanent-renumber check uses final holder path -> E-0034; F05 LOW test gap (E-0024 (3) "otherwise none"). Foreman reproduced F01, F02, F03.
 - P002 is at 2 consecutive CHANGES_REQUESTED; a third sets STALLED (PROTOCOL_V2 §8). R03 will run all remaining auditor angles (integration-regression added) to avoid late discoveries.
 - P011 accepted earlier; P012 opened (triage -> E-0030..E-0033; planner running).
+
+## 2026-10-10 P012 plan; P002 R02 remediation in progress
+
+- P012: kf-spec-triage 16 items -> E-0030..E-0033 (T-15 deferred to P007). kf-phase-planner: PLAN (38 targets), TRIAGE, TRACEABILITY; D-01..D-03 -> E-0036; P-02 accepted (additive-only P011 extension). Planner caught citation slips in E-0030/E-0031 (l.590->591, l.658->660, l.644->641); corrected.
+- P002: R02 remediation cases written (12 red); E-0035 decided (later promote at anchor invalid; optional headCommit; entities_skipped). Implementer running.
