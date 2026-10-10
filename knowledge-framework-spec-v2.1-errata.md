@@ -35,6 +35,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0021 | RE2 dialect in a Node engine; outputs and uncatalogued failures | DECIDED_BY_FOREMAN | LOW | P011, P012, P013, P014 |
 | E-0022 | Decision-table details from P011 planning (amends E-0019 on `when: {}`) | DECIDED_BY_FOREMAN | LOW | P011, P012, P014 |
 | E-0023 | P002 implementation details: cross-ID renumber order, ambiguous result fields, stale-lock break | DECIDED_BY_FOREMAN | MEDIUM | P002 |
+| E-0024 | Registry replay after real merges; alias projection across moves; canonical ref resolution (amends E-0012, E-0016) | DECIDED_BY_FOREMAN | MEDIUM | P002, P007 |
 
 ---
 
@@ -654,3 +655,33 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P002 R01)
 **Ratified**: pending
 **Affects.** P002.
+
+---
+
+## E-0024 — Registry replay after real merges; alias projection across moves; canonical ref resolution (amends E-0012, E-0016)
+
+**Clauses**
+- l.300: "Únicos, no reutilizables, independientes del nombre."
+- l.318: "**Un ID `permanent` SHALL NOT ser renumerado jamás.**"
+- l.319: "`id_alias` **SHALL** resolverse en todas las queries, indefinidamente."
+- l.1115: "**«Once published on the canonical branch, history SHALL NOT be rewritten.»**"
+- E-0007 (`merge=union`), E-0009 (first-parent history of the canonical branch), E-0011 (projection converges idempotently), E-0012 ("A second `promote` for one ID ... makes the registry invalid"), E-0016 (2a).
+
+**Question.** P002 R01 audit (findings F01/D02, D01, F02, D03) showed: (1) two branches that each ran an idempotent promotion and are then union-merged leave two byte-identical `promote` lines at non-adjacent positions, which E-0012 declares invalid, so a routine merge disables the registry; (2) E-0016 (2a) anchors the `id_alias` projection to the path of the `allocate`, so the projection is erased after the renumbered entity moves (recorded `move` after promotion, or an unrecorded relocation while still provisional, e.g. renaming its directory to match the new ID); (3) the reader accepts an `alias` that renumbers the file holding a promoted ID; (4) the canonical branch is resolved with `git rev-parse <name>`, which prefers a same-named tag and accepts revision expressions such as `main~1` or `main@{yesterday}`.
+
+**Decision.**
+1. **Exact duplicates are idempotent.** During replay, an event whose op and every field equal an earlier event's (`promote`, `alias`, `move`; `allocate` duplicates were already tolerated) is a no-op repeat. A `promote` for an already-promoted ID with a different `path` or `commit`, an `alias` with the same `from` and `path`-anchor but a different `to`, or a `move` that is not an exact repeat and whose `from` is not the current path remain invalid (fail closed). This refines E-0012's "second `promote`" to "second, *different* `promote`".
+2. **Renumbering a permanent ID is invalid.** An `alias` whose renumbered entity (point 3) is the current holder of `alias.from` — i.e. `alias.from` has a `promote` whose path, followed through recorded moves, equals the alias's anchor path — makes the registry invalid (l.318).
+3. **Alias projection follows the renumbered entity.** For an alias X→Y, the anchor path is the `path` of the `allocate Y` written by that renumbering (E-0015 D-02c / E-0016). The renumbered entity's *current* path is derived as follows:
+   - If Y has a `promote` event: when the promote's path equals the anchor, or equals no path of any other `allocate Y` event, the current path is Y's holder path (the promote path followed through recorded `move` events of Y). Otherwise (Y was promoted for a different entity that had its own `allocate Y`), the alias projects onto no file.
+   - If Y has no `promote` event: the current path is the anchor if a file carrying Y (or carrying X as the pending half of an interrupted renumber) exists there; otherwise the unique file carrying Y whose path equals no path of any `allocate Y` event; otherwise none.
+   - `id_alias` of a file is the chain of aliases (oldest first) whose renumbered entity's current path is that file's path, recursing through earlier aliases of the same entity. E-0016 (2a) is amended accordingly; its exclusion of an unrelated holder of Y still holds.
+4. **Canonical branch ref.** The engine resolves the canonical branch name only as a branch: `refs/heads/<name>` if it exists, otherwise `refs/remotes/origin/<name>`, otherwise `CANONICAL_BRANCH_UNRESOLVED`. Tags, revision expressions and reflog syntax are never accepted (names that fail `git check-ref-format --branch` are `CANONICAL_BRANCH_UNRESOLVED`). Git is invoked so that replace refs and grafts cannot alter history (`--no-replace-objects` / `GIT_NO_REPLACE_OBJECTS=1`).
+
+**Rationale.** (1) restores the merge-safety E-0007/E-0012 intended while keeping every genuine conflict fail-closed; (2) is the direct reading of l.318; (3) keeps the projection attached to the entity rather than to a path that legitimately changes, without inventing a provisional `move` writer; (4) makes "the canonical branch" mean a branch, identically on every clone.
+
+**Reversibility.** MEDIUM (replay validity and entity projections; no new event kinds or fields).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 audit R01)
+**Ratified**: pending
+**Affects.** P002, P007.
