@@ -39,7 +39,7 @@ Status values: `NOT_STARTED`, `PARTIAL` (some slice accepted, item not demonstra
 | 4 | Registrar evidencia con anclas verificables por resolver genérico y detectar drift | NOT_STARTED |
 | 5 | Derivar confianza por faceta según clase de evidencia | NOT_STARTED |
 | 6 | Crear unknowns y priorizar la cola de SMEs con sus cinco fuentes | NOT_STARTED |
-| 7 | Expresar `logic` en las tres gramáticas evaluables y verificarlo contra escenarios facetados | PARTIAL (decision-table grammar evaluable: P011 accepted at product 0e8f741, `node --test test/conformance-p011-decision-table.test.mjs` 172/172 at 023daae; formula P012, state-machine P013, scenario checking P014 pending) |
+| 7 | Expresar `logic` en las tres gramáticas evaluables y verificarlo contra escenarios facetados | PARTIAL (decision-table grammar evaluable: P011 accepted at product 0e8f741, `node --test test/conformance-p011-decision-table.test.mjs` 172/172 at 023daae; formula grammar evaluable: P012 accepted at product 23889a5, `KF_P012_BOUNDARY=1 node --test test/conformance-p012-formula.test.mjs` 131/131 at f037d41; state-machine P013, scenario checking P014 pending) |
 | 8 | Derivar divergencias con clave estable y disposition preservada | NOT_STARTED |
 | 9 | Generar `graph.json` con facetas | NOT_STARTED |
 | 10 | Servir context packs con safe context garantizado | NOT_STARTED |
@@ -52,7 +52,7 @@ Status values: `NOT_STARTED`, `PARTIAL` (some slice accepted, item not demonstra
 
 ## 3. Phases accepted
 
-2/28 (P001, P011).
+3/28 (P001, P011, P012).
 
 ## 4. How the Foreman updates this file
 

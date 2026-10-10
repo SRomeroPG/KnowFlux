@@ -125,3 +125,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 
 - Fresh conformance engineer: 13 case groups (only F-RM-D01 red). Fresh implementer: D01 fixed in the P012-appended block (P011 core unchanged; 0 deletions). Product commit 23889a5ea04494ec6884d90e01c0f3d8b7d1a848.
 - Foreman: P012 tests + conformance 203/203 with KF_P012_BOUNDARY=1; repro-p012-d01 -> LogicError INVALID_EXPRESSION.
+
+## 2026-10-10 P012 accepted R02
+
+- Re-audit R02 (test-conformance, 44 mutants): R01 D01 and T01-T07 fixed; one LOW coverage gap on the D01 fix (deep and multi-key holes) fixed in round (f037d41), product unchanged (Foreman repro confirms).
+- Foreman at f037d41: build ok, lint ok, KF_P012_BOUNDARY=1 npm test 817/817, P011 core unchanged, TRACEABILITY case ids resolve.
+- Accepted product SHA 23889a5. Scoreboard: §56 item 7 still PARTIAL (formula added); phases 3/28.
+- Per SKILL §6, a phase was accepted while P002 is pending R03; P002 is not STALLED, so no retry is triggered. Next secondary on Track B: P013 (state machine and narrative).
