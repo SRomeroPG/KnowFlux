@@ -75,3 +75,9 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Fresh kf-implementer (remediation): F01-F04 fixed under E-0024/E-0028; 22 unit tests in test/p002-remediation.test.mjs (12 red on the old engine). Product commit 08b3910.
 - Foreman verification: P002 test files + conformance 162/162; lint clean on P002 paths; the four R01 reproductions (repro-d01, repro-p002 F01/F02, repro-d03) now show the corrected behavior.
 - Errata E-0027 (P011 remediation readings) and E-0028 committed with this handoff.
+
+## 2026-10-10 P011 remediate R01 -> hand off R02
+
+- Fresh kf-conformance-engineer: 21 case keys (13 red before fix); readings decided as E-0027. Committed as the cases commit.
+- Fresh kf-implementer (remediation): F01-F06, F11 fixed; F07-F10 unit tests added; 4 unit assertions restated per E-0025 (3) / E-0022 D-05 (accepted by Foreman). Product commit 0e8f741.
+- Foreman verification at 0e8f741: build ok, lint ok, npm test 585/585; R01 reproductions now: 4-level zero-width repeat compiles in 1 ms, 1200-range class pattern 4 ms, null-absent overlap reported statically with witness null.

@@ -1,4 +1,6 @@
-# P011 HANDOFF (round R01, kf-implementer)
+# P011 HANDOFF (round R01, kf-implementer; updated after the R01 remediation)
+
+**Status after the R01 remediation** (audit `audits/AUDIT_R01.md`, findings F01-F11; errata E-0025, E-0026, E-0027; details in `remediation/REMEDIATION_R01.md`): `npm run build` ok (19 schemas), `npm run lint` clean, `npm test` 585 of 585, `node --test test/p011-*.test.mjs test/conformance-p011-decision-table.test.mjs` 278 of 278 (170 conformance cases, no `todo`), `git diff --check` clean. Changed product files in the remediation: `framework/engine/regex-re2.mjs`, `framework/engine/decision-table.mjs`, `test/p011-regex.test.mjs`, `test/p011-decision-table.test.mjs`. The sections below describe the first hand-off; where the remediation changed a statement it is marked "(R01 remediation)" or "(superseded)".
 
 Base: product work was done on top of `ceb8bfc` (`P011 add conformance slice`). The worktree branch started at `d06ca4e`; it was brought to `ceb8bfc` with `git merge --ff-only ceb8bfc` (fast-forward only, no history rewrite). Nothing is committed: all changes are uncommitted in the worktree for the Foreman to commit. Product commit SHA: to be filled by the Foreman at commit time.
 
@@ -15,16 +17,16 @@ New engine modules (all ES modules, no side effects on import, imports only `./`
 | `framework/engine/logic-diagnostics.mjs` | `LOGIC_DIAGNOSTIC_CATALOG` (310, 311, 312, 314, 315; remediation only on 311), `makeDiagnostic`, `compareStrings` (code point = UTF-8 byte order), `sortDiagnostics` |
 | `framework/engine/decision-table.mjs` | `checkDecisionTable`, `evaluateDecisionTable`, `DEFAULT_PROOF_LIMIT` |
 
-Tests (new): `test/p011-decimal.test.mjs`, `test/p011-units.test.mjs`, `test/p011-regex.test.mjs`, `test/p011-decision-table.test.mjs` (92 tests; names start with the clause, e.g. `§12.1 l.633 (E-0020): ...`). `TRACEABILITY.md` filled (every row `PASS` with a test title or conformance case id). `framework/engine/id-registry*.mjs`, `package.json`, `package-lock.json`, `eslint.config.js`, schemas, conformance data, spec, errata untouched.
+Tests (new): `test/p011-decimal.test.mjs`, `test/p011-units.test.mjs`, `test/p011-regex.test.mjs`, `test/p011-decision-table.test.mjs` (92 tests at the first hand-off, 108 with the R01 additions; names start with the clause, e.g. `§12.1 l.633 (E-0020): ...`). `TRACEABILITY.md` filled (every row `PASS` with a test title or conformance case id). `framework/engine/id-registry*.mjs`, `package.json`, `package-lock.json`, `eslint.config.js`, schemas, conformance data, spec, errata untouched.
 
-## Verification output
+## Verification output (first hand-off; superseded by the status line at the top for the final numbers)
 
 - Baseline (before my changes, at `ceb8bfc`): `npm run build`, `npm run lint`, `npm test` green with the 148 P011 engine cases `todo`.
 - Final: `npm run build` -> `Compiled 19 JSON Schemas.`; `npm run lint` clean; `npm test` -> tests 457, pass 246, fail 0, todo 211 (the 148 P011 conformance cases plus P002's todo cases); `git diff --check` clean; `git status` shows only the new files above and `TRACEABILITY.md`/`HANDOFF.md`.
 - Targeted run twice (deterministic repeat): `node --test test/conformance-p011-decision-table.test.mjs test/p011-*.test.mjs` -> tests 241, pass 93, fail 0, todo 148 both times.
 - Conformance, per case (`node --test test/conformance-p011-decision-table.test.mjs`): **145 of the 148 todo cases pass**; the 3 failures (F-R1, F-R2, F-R2b) are all caused by two defective data rows, listed below. A scripted run of every row of `regex.yaml` (`match`, `compile_ok`, `rejected`, `accepted`) against the engine reports exactly those two rows and nothing else.
 
-## Disputed expectations (not edited; supporting clauses)
+## Disputed expectations (superseded: both data rows were corrected in `5712486`; no expectation is disputed in the R01 remediation)
 
 Both are in `framework/conformance/p011-decision-table/regex.yaml`, which says "Patterns are single-quoted (backslashes literal)". YAML single quotes do not unescape, so a single `\` in the file is ONE backslash.
 
@@ -41,18 +43,19 @@ None blocking. Items below were not determined by spec + errata + PLAN; I chose 
 - N-03 (`units`): strict shape. Top-level keys other than `units`/`conversions` are `INVALID_UNITS`; `conversions` must be present and `[]`; entries carry exactly `id`, `dimension`, `symbol` (`id`, `dimension` non-empty). Options: tolerate extra keys; allow absent `conversions`.
 - N-02 (enum `domain`): `domain` present must be a non-empty list of distinct strings (else `INVALID_INPUT_DECLARATION`); `domain` on a non-enum input is `INVALID_INPUT_DECLARATION`; an enum without `domain` is accepted unless `exhaustive: true` (`missing_domain`). Options: allow empty or non-string domains.
 - N-01: two inputs with the same `ref` -> `INVALID_INPUT_DECLARATION`.
-- N-09: `null` is accepted as an operand of `eq`/`ne`/`in`/`not_in` (never matches, `eq: null` is false per E-0019); `null` for `lt`/`lte`/`gt`/`gte`/`between` is `INVALID_DECIMAL`. A number/boolean literal against `enum`/`string`/`boolean` inputs is `TYPE_MISMATCH`.
+- N-09 (R01 remediation: now decided by E-0026 (1)): `null` is accepted as an operand of `eq`/`ne`/`in`/`not_in`; `eq: null` and `ne: null` are false, an `in` element `null` never matches, a `not_in` element `null` makes `not_in` false; `null` for `lt`/`lte`/`gt`/`gte`/`between` is `INVALID_DECIMAL`. A number/boolean literal against `enum`/`string`/`boolean` inputs is `TYPE_MISMATCH`.
 - N-07: `all` nested inside a row is flattened as a conjunction for the overlap proof (sound); a row containing `any`, `not`, `ne`, `not_in`, `matches`, `is_null`, or a null/bad operand is never proven disjoint.
 - Matcher mapping with more than one operator key (`{gt: 1, lt: 5}`), an empty matcher mapping, or an operand mapping without exactly `{value, unit}` on a quantity input -> `INVALID_TABLE`.
-- Regex corner cases not covered by E-0021/E-0022: an unescaped `{` that is not `{n}`, `{n,}`, `{n,m}` is rejected (RE2 would treat it as a literal); `}` and `]` outside a class are literals; a quantifier directly on `^`/`$` is rejected; `\` + ASCII punctuation (not `_`) is a literal; `[]a]` and `[^]a]` take a leading `]` as literal; a class range ending in a class escape is rejected; a counted repeat count is clamped while reading so huge digit strings are rejected, not overflowed.
-- Supplied quantity with an undeclared unit id is `KF-E-310` (a different unit), not `UNKNOWN_UNIT` (that code is for table-side units). A bare YAML number for a quantity input is `INVALID_DECIMAL`; a boolean or non-quantity mapping is `TYPE_MISMATCH`.
+- Regex corner cases not covered by E-0021/E-0022: an unescaped `{` that is not `{n}`, `{n,}`, `{n,m}` is rejected (RE2 would treat it as a literal); `}` and `]` outside a class are literals; a quantifier directly on `^`/`$` is rejected; (R01 remediation, E-0022 D-05) only the escaped metacharacters `\ ^ $ . | ? * + ( ) [ ] { }` and `-` are accepted as literals, every other escaped punctuation is rejected; `[]a]` and `[^]a]` take a leading `]` as literal; a class range ending in a class escape is rejected; a counted repeat count is clamped while reading so huge digit strings are rejected, not overflowed.
+- Supplied quantity with an undeclared unit id is `KF-E-310` (a different unit), not `UNKNOWN_UNIT` (that code is for table-side units). A bare YAML number for a quantity input is `INVALID_DECIMAL`; (R01 remediation, E-0025 (3)) a string or boolean is a bare scalar and yields `KF-E-310` with `found_unit: null`; a non-quantity mapping or list is `TYPE_MISMATCH`.
 - `evaluateDecisionTable` with a table that has a static 310/314/315 finding returns `status: error` before looking at the supplied keys (so an unbound supplied key is not reported in that case).
 - `product` of `KF-E-311 over_limit` is a number, or a decimal string if it exceeds `Number.MAX_SAFE_INTEGER` (counts only; computed in BigInt).
 - Depth guards: predicates and `then` nested deeper than 1000 levels, and regex groups nested deeper than 1000, are rejected (`INVALID_TABLE` / `{ok: false}`) so hostile input cannot overflow the stack. An empty `rules` list is accepted although the schema has `minItems: 1` (D-01: no schema validation here).
 
 ## Deferred / not done
 
-- No wall-clock bound beyond the tested 5 s cases. Per-character matching cost is O(program size) with program size capped at 100000 instructions, so a 100000-instruction program on a very long text is slow but bounded (linear in the text for a fixed program).
+- No wall-clock bound beyond the tested 5 s cases. Per-character matching cost is O(program size) with program size capped at 100000 instructions, so a 100000-instruction program on a very long text is slow but bounded (linear in the text for a fixed program). Audit ADVISORY A-01 (13.6 s for a 48002-instruction program on 20000 characters; no input-length bound exists in spec or PLAN) is carried to P014 (scenario evaluation budget). Compile time and memory are now bounded by a constant multiple of the instruction cap (R01 remediation F01/F02).
+- Other audit ADVISORY items (A-02..A-05, A-07) are out of the remediation scope.
 - `KF-W-124`, `units.yaml` discovery, JSON Schema validation, `kf check-rules`, division/rounding/formulas, state machines: other phases (PLAN non-goals).
 - Known fail-closed over-reporting (E-0020 by design): `KF-E-312 not_proven_disjoint` on actually disjoint rows that use `any`, `not`, `ne`, `not_in`, `matches`, `is_null` when the enumeration proof is not available.
 
