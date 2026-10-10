@@ -29,3 +29,8 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - kf-phase-planner (sonnet): PLAN rewritten to v2 (55 verification targets, engine API contract), TRIAGE.md, TRACEABILITY skeleton. Planner raised D-01..D-05; decided as E-0015.
 - Foreman spot-checked PLAN quotes at l.300, l.304, l.371, l.1742 against the spec: verbatim.
 - Status P002: PLANNED -> IMPLEMENTING.
+
+## 2026-10-10 P002 conformance decisions; P011 triage (secondary, Track B)
+
+- kf-conformance-engineer (sonnet) raised 2 DECISION_NEEDED on P002 resolveId/id_alias; decided as E-0016 (LOW). Engineer re-briefed (same instance) to tighten F-R4/F-E4.
+- kf-spec-triage (sonnet) on P011: 12 items. T-01..T-11 decided as E-0017..E-0021; T-12 record-only (KF-E-313 belongs to P012). P011 opened as secondary on Track B (disjoint paths; implementer will run in a worktree).

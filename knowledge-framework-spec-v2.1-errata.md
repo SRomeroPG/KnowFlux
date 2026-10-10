@@ -27,6 +27,12 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0013 | Registry lock: stale detection and recovery | DECIDED_BY_FOREMAN | LOW | P002 |
 | E-0014 | ID-registry failures without a §42.2 code; P002 surface is engine API only | DECIDED_BY_FOREMAN | LOW | P002, P007, P028 |
 | E-0015 | ID-registry operational details (init on existing `.kf/`, renumber order, unregistered/ambiguous, owner-less lock, empty registry form) | DECIDED_BY_FOREMAN | MEDIUM | P002, P007, P028 |
+| E-0016 | Shape of ambiguous `resolveId` results; scope of the `id_alias` projection | DECIDED_BY_FOREMAN | LOW | P002, P021, P022 |
+| E-0017 | Decimal representation and lexical form | DECIDED_BY_FOREMAN | MEDIUM | P011, P012, P014 |
+| E-0018 | Unit registry input and unknown units | DECIDED_BY_FOREMAN | LOW | P011, P012, P007 |
+| E-0019 | Decision-table matching semantics: binding, types, units, nulls, enums | DECIDED_BY_FOREMAN | MEDIUM | P011, P012, P014 |
+| E-0020 | Hit policies, `default`, overlap proof, exhaustiveness proof | DECIDED_BY_FOREMAN | LOW | P011, P014 |
+| E-0021 | RE2 dialect in a Node engine; outputs and uncatalogued failures | DECIDED_BY_FOREMAN | LOW | P011, P012, P013, P014 |
 
 ---
 
@@ -439,3 +445,159 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P002 planning)
 **Ratified**: pending
 **Affects.** P002, P007, P028.
+
+---
+
+## E-0016 — Shape of ambiguous `resolveId` results; scope of the `id_alias` projection
+
+**Clauses**
+- l.317: "El engine renumera el de `first_canonical_commit` posterior y registra `id_alias`."
+- l.319: "`id_alias` **SHALL** resolverse en todas las queries, indefinidamente."
+- E-0003 (live holder wins; no silent re-routing); E-0011 (`id_alias` on the renumbered entity); E-0015 D-03(b).
+
+**Question.** (1) What is the shape of `candidates` when `resolveId` returns `status: 'ambiguous'`? (2) When an entity other than the renumbered one later holds the alias target ID, does it also receive `id_alias`? (P002 conformance DECISION_NEEDED 1 and 2)
+
+**Options considered**
+1. (1a) strings (IDs or paths depending on the case); (1b) objects `{id, path}` in both cases.
+2. (2a) project `id_alias` only onto the entity that the alias renumbered (the file at the path of the `allocate` event of the alias's `to` ID written by the same renumbering); (2b) onto any holder of the target ID.
+
+**Decision.** (1b): `candidates` is a list of `{id, path}` objects, sorted by `id` then `path` in ascending UTF-8 byte order. (2a): `id_alias` is projected only onto the renumbered entity; any other holder of the target ID gets no `id_alias` from that alias. E-0011 places `id_alias` "on the renumbered entity"; projecting it elsewhere would attach an alias to an entity that never carried the old ID.
+
+**Reversibility.** LOW (API shape; entity projection is re-derivable from the registry).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 conformance)
+**Ratified**: pending
+**Affects.** P002, P021, P022.
+
+---
+
+## E-0017 — Decimal representation and lexical form
+
+**Clauses**
+- l.582: "Todo valor numérico de negocio **SHALL** evaluarse como **decimal de precisión arbitraria**. Coma flotante binaria **SHALL NOT** usarse en la evaluación de reglas."
+- l.583: "En YAML, los decimales **SHALL** escribirse como string entrecomillado (`"4.2"`) para evitar que el parser los convierta a float."
+- l.1955: "decimal_precision: 28"
+
+**Question.** Arbitrary precision (l.582) versus a configured `decimal_precision: 28` (l.1955); value equality of `"4.20"` and `"4.2"`; accepted lexical form; treatment of unquoted YAML numbers. (P011 triage T-01)
+
+**Options considered**
+1. Exact decimal `{unscaled: BigInt, scale}`; exact comparison, addition, subtraction, multiplication; `decimal_precision` applies only to operations that cannot be exact (division, P012); equality and ordering by numeric value; lexical form exactly `^-?[0-9]+(\.[0-9]+)?$` (the P001 `quantity.value` pattern); a YAML number where a decimal is required is rejected.
+2. Round every value to 28 significant digits on load.
+
+**Decision.** Option 1. `"4.20"` equals `"4.2"`; `"-0"` equals `"0"`. A non-string (YAML number) supplied where a decimal operand is required is a typed engine error `INVALID_DECIMAL` (internal code, E-0014 precedent), as is any string outside the pattern (`"4,2"`, `".5"`, `"1e3"`, `"+1"`). The precision is an explicit parameter of the inexact operations, never global state.
+
+**Rationale.** Literal reading of l.582 for every exact operation; l.583 makes quoted strings the only valid encoding, so rejecting numbers fails loudly instead of silently trusting a float parse; l.1955 keeps a meaning where precision is genuinely needed.
+
+**Reversibility.** MEDIUM (module API is the base of P012; no persisted format).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 triage)
+**Ratified**: pending
+**Affects.** P011, P012, P014.
+
+---
+
+## E-0018 — Unit registry input and unknown units
+
+**Clauses**
+- l.589: "Unidad declarada distinta de unidad recibida es ERROR (`KF-E-310`)."
+- l.591: "`percent` a secas **SHALL NOT** ser una unidad válida en un dominio donde exista ambigüedad masa/volumen: el framework distribuye `percent_mass`, `percent_volume`, `percent_mass_per_volume` y **SHALL NOT** tratarlas como intercambiables."
+- l.593-598: "Las unidades se declaran en `extensions/<domain>/units.yaml`:" with `units: - {id, dimension, symbol}` and "conversions: []     # vacío en v1".
+
+**Question.** Who discovers and loads `units.yaml`, what shape is validated, and what happens to a unit id that no registry declares? (T-03)
+
+**Options considered**
+1. P011 engine functions take an already-built unit registry; P011 ships a validator/loader for exactly the l.596-597 shape (`units[]` of `{id, dimension, symbol}` strings, unique `id`; `conversions` must be an empty list); discovery and merging of `extensions/*/units.yaml` belongs to the phase that wires `kf validate` (P007), where a unit id declared twice is an error.
+2. P011 also owns file discovery.
+
+**Decision.** Option 1. A unit id used in a table input, literal or output that the registry does not declare is a typed engine error `UNKNOWN_UNIT` (internal code; no catalog code fits). No unit set is assumed to be built in; bare `percent` is valid only if a registry declares it, and units are compared by `id` only (never by `dimension` or `symbol`), so the `percent_*` variants are never interchangeable.
+
+**Rationale.** Keeps the persisted format exactly as quoted; keeps file-system policy out of a pure-logic phase; unit identity by `id` is the direct reading of l.589/l.591.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 triage)
+**Ratified**: pending
+**Affects.** P011, P012, P007.
+
+---
+
+## E-0019 — Decision-table matching semantics: binding, types, units, nulls, enums
+
+**Clauses**
+- l.620-629 (§12.1 grammar): "predicate := { field: matcher } | { all: [predicate] } | { any: [predicate] } | { not: predicate }"; "matcher   := literal"; "{ between: [min, max] }        # inclusivo en ambos extremos"; "value     := scalar | quantity".
+- l.589 (`KF-E-310`); l.606: "`null` **SHALL** significar "ausente", nunca "cero" ni "falso"."; l.607: "Toda comparación con un operando `null` evalúa a `false`, salvo `is_null`."; l.608: "Todo `enum` **SHALL** declarar su `domain`. Un valor fuera del dominio en un escenario → `KF-E-314`."
+- l.448-451 (BR-0037 example): input `{ref: DE-0017.material_type, type: enum, domain: [X, Y, Z]}` with `when: {material_type: {not_in: [X]}}`.
+- l.1769: "| `KF-E-314` | E | Valor fuera del dominio del enum | — |"
+
+**Question.** How `when` keys bind to `inputs[]`; operator/type rules; unit mismatches; null and absent inputs; out-of-domain enum values outside scenarios. (T-02, T-04, T-05, T-09)
+
+**Decision.**
+- Binding: a `when` field key matches an input whose `ref` equals the key, or whose `ref` suffix after the last `.` equals the key. A key matching no input, or a suffix shared by two inputs, is a typed error (`UNBOUND_FIELD` / `AMBIGUOUS_FIELD`). Several keys in one predicate mapping are a conjunction. An empty predicate mapping `{}` is a typed error (`EMPTY_PREDICATE`); the only unconditional row is `when: default` (E-0020).
+- Literal matcher means `eq`. `eq`, `ne`, `in`, `not_in` compare strings, booleans and enum values exactly (case-sensitive, code-point equality) and decimals/quantities by value (E-0017). `lt`, `lte`, `gt`, `gte`, `between` apply only to decimal and quantity inputs; any other operand type is a typed error `TYPE_MISMATCH`. `between` with `min > max` is a typed error.
+- Units: a quantity is comparable only with a quantity of the identical unit id. A different unit id, or a quantity against a bare scalar (either direction), is `KF-E-310` — both statically (a literal in `when` versus the input's declared `unit`, reported by the table check) and at evaluation (a supplied value versus the declared `unit`). Never coerced, never `false`.
+- Null: binary logic. An input absent from the supplied values is `null`. Every matcher except `is_null` evaluates to `false` on a `null` operand, including `ne` and `not_in`; `eq: null` is `false`; `is_null: true` is the only test for absence. `not` negates the boolean result of its predicate (so `not: {x: {eq: 1}}` is `true` when `x` is null).
+- Enums: a value outside the input's `domain` is `KF-E-314` wherever it occurs — a supplied value at evaluation (whoever calls) and a literal in `when` at table check. The catalog condition (l.1769) is not restricted to scenarios; l.608 names the scenario case as one instance.
+
+**Rationale.** Literal reading of the grammar and of l.607; fail loudly on type and unit misuse (rules are regulated content); binding by suffix is what the only spec example does.
+
+**Reversibility.** MEDIUM (affects how fixtures and rules are authored).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 triage)
+**Ratified**: pending
+**Affects.** P011, P012, P014.
+
+---
+
+## E-0020 — Hit policies, `default`, overlap proof, exhaustiveness proof
+
+**Clauses**
+- l.632: "`hit_policy: first | unique | collect`."
+- l.633: "`unique` **SHALL** verificar ausencia de solapamiento → `KF-E-312`."
+- l.634: "**`exhaustive: true` SHALL exigir una fila `when: default`**, salvo que todos los inputs sean enums de dominio finito y el producto cartesiano de sus dominios sea ≤ `logic.exhaustiveness_proof_limit` (default `256`), en cuyo caso el engine enumera y prueba cobertura total. Fuera de eso → `KF-E-311`. Nada de SAT solver disfrazado de Knowledge Framework."
+- l.1766-1767: `KF-E-311` "`exhaustive: true` sin default ni dominio probable"; `KF-E-312` "Solapamiento con `hit_policy: unique`".
+
+**Question.** Result shape per hit policy; meaning and position of `default`; how "ausencia de solapamiento" is verified deterministically without a solver; exhaustiveness details. (T-06, T-07)
+
+**Decision.**
+- `default`: at most one row may have `when: default` (a second is a typed error). It matches if and only if no other row matches, regardless of its position, under every hit policy. It never counts toward overlap.
+- `first`: the result is the first matching non-default row in document order, else the default row, else no match. `collect`: all matching non-default rows in document order, else `[default]`, else `[]`. `unique`: the single matching non-default row, else the default row, else no match; if two or more non-default rows match a supplied input, evaluation reports `KF-E-312`. No match is a normal result (`null` / `[]`), not an error.
+- Static overlap check for `unique`: (a) if every input is an enum with a declared domain and the product of domain sizes is ≤ the proof limit, enumerate every tuple and report `KF-E-312` for the first tuple (enumeration order: inputs in `inputs[]` order, values in `domain` order) matched by two or more non-default rows, naming the first two such rows in document order and the witness tuple; (b) otherwise two rows are proven disjoint only if both are conjunctions of field matchers (no `any`, `not`, `matches`, `ne`, `not_in`) and some shared field has non-intersecting constraints (value sets for `eq`/`in`; closed/open decimal intervals for `lt`/`lte`/`gt`/`gte`/`between`/`eq`); any pair not proven disjoint is reported `KF-E-312` (overlap not excluded). This is a per-field interval/set comparison, not a solver.
+- Exhaustiveness (`exhaustive: true`): satisfied by a `default` row. Otherwise every input must be `type: enum` with a declared `domain` and the product of domain sizes must be ≤ the limit (inclusive); the engine enumerates every tuple (same order as above) and reports `KF-E-311` with the first uncovered tuple. Any other input type (including boolean and quantity), a missing domain, or a product over the limit is `KF-E-311`. `exhaustive: false` or absent: no check. The limit is an explicit parameter (default 256, l.1954).
+
+**Rationale.** Fail closed where absence of overlap or full coverage is not proven (l.633 and l.634 both demand proof); the only proof techniques used are enumeration (named by l.634) and per-field interval/set comparison.
+
+**Reversibility.** LOW (diagnostics and evaluation results; no persisted format).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 triage)
+**Ratified**: pending
+**Affects.** P011, P014.
+
+---
+
+## E-0021 — RE2 dialect in a Node engine; outputs and uncatalogued failures
+
+**Clauses**
+- l.612: "Dialecto **RE2** (sin backreferences ni lookaround, sin backtracking catastrófico). Las reglas se evalúan en CI; una regex patológica es un fallo de disponibilidad. Patrón no compilable en RE2 → `KF-E-315`."
+- l.1956: "regex_dialect: re2"
+- l.452, l.455: `then: {max_concentration: {value: "4.2", unit: percent_mass}, outcome: OUT-0004}` and `then: {exempt: true, outcome: OUT-0009}`.
+
+**Question.** How to honor RE2 (no catastrophic backtracking) with no native dependency; `matches` semantics; `then` typing; failures with no catalog code. (T-08, T-10, T-11, T-12)
+
+**Options considered (regex)**
+1. Blacklist backreferences/lookaround, then match with JS `RegExp` (no linear-time guarantee).
+2. Add the native `re2` package (new dependency; native builds on the CI matrix; needs human approval).
+3. Parse a whitelisted RE2 subset and match with an engine-owned linear-time automaton.
+
+**Decision.**
+- Regex: option 3. Accepted syntax: literals and escaped metacharacters, `.`, character classes with ranges and negation, `\d \w \s \D \W \S`, anchors `^ $`, groups `( )` and `(?: )`, alternation `|`, quantifiers `* + ? {n} {n,} {n,m}` with n, m ≤ 1000, and their lazy forms (which do not change match/no-match). Anything else (backreferences, lookaround, named groups, inline flags, Unicode property escapes, possessive/atomic forms, larger repeat counts) is `KF-E-315`, reported by the table check. Matching is unanchored search (RE2 partial match), case-sensitive, over code points, in time linear in input length for a fixed pattern. `matches` on `null` is `false` (E-0019); on a non-string value it is `TYPE_MISMATCH`.
+- Outputs: `then` is an opaque mapping returned verbatim (decimal strings and quantities unchanged); quantity unit ids in `then` must be declared (`UNKNOWN_UNIT`, E-0018). `outcome` is not cross-checked against other entities in P011 (P007).
+- Input types supported: `enum`, `quantity` (requires `unit`), `decimal`, `string`, `boolean`. Any other `type`, `unit` on a non-quantity input, duplicate rule `id` in one table: typed errors.
+- Uncatalogued failures use internal typed codes (not `KF-`), following the E-0014 precedent; P007/P014 map them when wiring the CLI. `KF-E-313` (division by zero) does not apply to decision tables; the decimal module exposes division for P012.
+
+**Rationale.** Option 3 is the only one that satisfies l.612's availability concern without a new native dependency; the subset covers what business rules need and rejects the rest loudly.
+
+**Reversibility.** LOW (behavioral; no persisted format beyond what rules already contain).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 triage)
+**Ratified**: pending
+**Affects.** P011, P012, P013, P014.

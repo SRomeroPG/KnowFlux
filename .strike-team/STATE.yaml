@@ -251,7 +251,7 @@ foreman:
   last_run: 2026-10-10
   consecutive_failed_rounds: 0
 
-pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015]
+pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021]
 open_decisions: [E-0006]
 open_spec_gaps: []
 
