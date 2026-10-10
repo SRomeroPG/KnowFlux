@@ -62,3 +62,9 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Errata decided: E-0025 (amends E-0020, clarifies E-0019), E-0026.
 - Remediation: fresh conformance engineer first (new cases), then fresh implementer.
 - `consecutive_failed_rounds` is now tracked per phase in STATE.yaml.
+
+## 2026-10-10 P002 audit R01 -> CHANGES_REQUESTED
+
+- Auditors: spec-compliance, algorithm-determinism, test-conformance (sonnet, fresh, blind pass confirmed). Architecture and integration-regression auditors deferred to R02.
+- 10 REQUIRED findings: F01 MEDIUM union merge of idempotent promotions invalidates the registry (defect in E-0012; fixed by E-0024); F02 MEDIUM id_alias erased after move; F03/F04 LOW (permanent renumber accepted; canonical ref = any revision, tag shadows branch); F05-F10 test gaps (surviving mutants) and E-0024 cases. Foreman reproduced F01-F04.
+- Remediation: fresh conformance engineer first, then fresh implementer.
