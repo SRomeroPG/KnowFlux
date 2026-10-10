@@ -50,6 +50,8 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0036 | P012 planning details: `KF-E-316` cascade, protection criterion, significant digits | DECIDED_BY_FOREMAN | LOW | P012, P014 |
 | E-0037 | P012 conformance readings: nested protecting guards; identity among known units | DECIDED_BY_FOREMAN | LOW | P012 |
 | E-0038 | Formula evaluation order with nulls; depth counting | DECIDED_BY_FOREMAN | LOW | P012 |
+| E-0039 | State-machine checks and evaluation | DECIDED_BY_FOREMAN | MEDIUM | P013, P014, P007 |
+| E-0040 | Narrative logic checks and notice | DECIDED_BY_FOREMAN | LOW | P013, P014, P021, P007 |
 
 ---
 
@@ -1040,3 +1042,99 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 **Decided**: 2026-10-10 by Foreman (P012 audit R01)
 **Ratified**: pending
 **Affects.** P012.
+
+---
+
+## E-0039 — State-machine checks and evaluation
+
+**Clauses**
+- l.667-683 (grammar example); l.688: "Estado inalcanzable desde `initial` → `KF-W-317`."; l.689: "Estado no terminal sin camino a ningún terminal → `KF-E-318`."; l.690: "Dos transiciones con el mismo `from` y guards solapados sin `priority` → `KF-E-319`."; l.691: "`completeness: total` **SHALL** exigir que todo par (estado no terminal, trigger declarado) tenga transición o rechazo explícito."
+- P001 schema `stateMachine.transitions[]`: required `id, from, to, trigger`; optional `guard` (object), `produces`, `performed_by`, `priority` (integer); `additionalProperties: true`.
+- E-0019, E-0020, E-0022 D-08, E-0025, E-0031 (1), E-0014.
+
+**Question.** Several state-machine points are left to invention (P013 triage T-01 to T-09, T-13):
+- how reachability and terminal paths treat guards;
+- what "solapados" means and which pairs are compared;
+- the direction of `priority`;
+- where triggers are "declared" and how an explicit rejection is written;
+- what `partial` means, and which code a `total` gap uses;
+- the evaluation API;
+- binding;
+- structural errors.
+
+**Decision.**
+
+1. **Reachability (`KF-W-317`).** Structural and guard-blind. A transition's `to` is reachable when its `from` is reachable, from `initial`. One warning per unreachable state, in `states[]` order.
+
+2. **Terminal paths (`KF-E-318`).** Structural and guard-blind backward reachability from every `terminal` state over the `from → to` edges. Every non-terminal state in `states[]` outside that set gets one `KF-E-318`, whether or not it is reachable. A state that is both unreachable and dead gets both diagnostics. Cycles with an exit are fine. With `terminal: []`, every state is `KF-E-318`.
+
+3. **Overlap (`KF-E-319`).**
+   - Only pairs with the same `from` **and** the same `trigger` are compared. Transitions on different triggers never compete for one event, so the literal "mismo `from`" is read within one event.
+   - An absent guard is `true`.
+   - "Solapados" means not proven disjoint under E-0020 / E-0025. Enumeration including `null` applies when every input the two guards mention is an enum within the limits. Otherwise the per-field interval/set comparison applies, fail closed.
+   - A pair is exempt iff both transitions carry `priority` and the two values differ.
+
+4. **`priority`.** An integer where the **higher value wins**. Equal priorities on an overlapping pair are still `KF-E-319`. A pair where only one transition carries `priority` is still `KF-E-319`.
+
+5. **Declared triggers and explicit rejection (`total`).**
+   - The declared triggers are the union of `trigger` values of this machine's transitions. A caller may pass `triggers: [EVT-id]`, which replaces the union (P007 builds it from the process model).
+   - An **explicit rejection** is a transition with `rejected: true` whose `to` equals its `from`. The schema allows the extra key. `rejected: true` with `to ≠ from` is `INVALID_EXPRESSION`.
+   - Under `total`, every pair (non-terminal state, declared trigger) needs at least one transition or rejection with that `from` and `trigger`. Guards are not considered.
+
+6. **`partial` and the `total` gap code.**
+   - `partial` means no completeness check.
+   - A `total` gap is reported as a returned diagnostic with the internal code `INCOMPLETE_TOTAL`, severity `E`, and the fields `state` and `trigger`. It is sorted with the P011 key. It is not a `KF-` code, because §42.2 has none for this SHALL. Adding a catalog code is a human decision; until then P007 maps the internal code.
+
+7. **Evaluation.** `evaluateStateMachine(logic, {state, trigger, values}, options)`.
+   - Candidates are the transitions with `from == state` and `trigger == trigger` whose guard is true (P011 predicate semantics).
+   - The highest `priority` is selected first, then document order among equal or absent priorities. A runtime tie among overlapping candidates without distinct priorities is the typed error `AMBIGUOUS_TRANSITION`.
+   - The result is one of:
+     - `{status: 'transition', transition, from, to, produces, performed_by}`;
+     - `{status: 'rejected', transition}` for a selected rejection;
+     - `{status: 'no_transition'}`.
+   - `produces` and `performed_by` are pass-through. A `state` not in `states` is `UNKNOWN_STATE`.
+   - Static findings block evaluation, as in P011.
+
+8. **Binding.**
+   - Guard predicates bind through the caller-supplied `inputs` (E-0031 (1), E-0019).
+   - `guard` must be exactly `{when: predicate}`, otherwise `INVALID_EXPRESSION`. `guard: {when: {}}` is unconditional (E-0022 D-08).
+   - `entity` and `state_field` are checked for presence and pattern only; the current state is an explicit argument.
+   - `trigger`, `produces` and `performed_by` are checked against their patterns only. Their existence is checked in P007.
+
+9. **Structural errors.** These are thrown as typed errors before diagnostics:
+   - `initial` not in `states`, a `terminal` or `from`/`to` not in `states`: `UNKNOWN_STATE`;
+   - a duplicate transition `id`: `DUPLICATE_ID`;
+   - malformed shapes: `INVALID_EXPRESSION`.
+
+**Rationale.** Structural graph checks need no solver. Restricting overlap to one event avoids false positives on every multi-event state. The rejection key is the minimal persistent addition that makes the SHALL at l.691 satisfiable, and it fits the open transition schema.
+
+**Reversibility.** MEDIUM: the `rejected` key and the `priority` direction persist in rule files. The rest is LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P013 triage)
+**Ratified**: pending
+**Affects.** P013, P014, P007.
+
+---
+
+## E-0040 — Narrative logic checks and notice
+
+**Clauses**
+- l.695-699: "`logic.unstructured_reason` es obligatorio." / "**`verification.mode` es obligatorio** (§25.4). Sin él → `KF-E-330`." / "El engine **SHALL** emitir en toda salida que incluya la faceta: *"Narrative rule — automated rule evaluation unavailable."*"
+- l.1352-1368 (§26.3: `verification: {mode: attested | external-test, ...}`, at facet level).
+- E-0005, E-0008 (a).
+
+**Question.** The narrative rules leave open when `KF-E-330` fires, the exact notice text and its engine form, and what the checker receives, since `verification` is a facet sibling of `logic` (P013 triage T-10 to T-12, T-14).
+
+**Decision.**
+- `checkNarrative(logic, verification)` returns `KF-E-330` iff `verification` is absent, has no `mode`, or has a `mode` outside `attested | external-test`.
+- A missing or empty `unstructured_reason` is the typed error `INVALID_EXPRESSION`; the P001 schema also enforces it.
+- The `attested_by` / `external_test` payloads are not checked.
+- The engine exports `NARRATIVE_NOTICE = "Narrative rule — automated rule evaluation unavailable."`, with U+2014 and a trailing period, exactly as at l.698.
+- `evaluateNarrative(logic)` returns `{status: 'unavailable', notice: NARRATIVE_NOTICE}`.
+- Emitting the notice in every output that includes the facet is an obligation on the later phases that produce outputs (CLI, context, check-rules), recorded here.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P013 triage)
+**Ratified**: pending
+**Affects.** P013, P014, P021, P007.

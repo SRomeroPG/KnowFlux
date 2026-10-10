@@ -11,6 +11,8 @@ Append-only. One entry per Foreman action (timestamp, phase, action, commit SHA,
 - E-0011 (`id_status` kept in entity; `id_alias` string list added to `entityBase` schema), MEDIUM, schema change. Affects P002, P007.
 - E-0012 (registry: one flow-mapping event per line; duplicate provisional allocations tolerated; refines E-0007), MEDIUM, persistent format. Affects P002, P007, P028.
 - E-0015 (renumber order and `alias.commit`; empty registry written as bare `events:`), MEDIUM, persisted bytes. Affects P002, P007, P028.
+- E-0039 (state machines: explicit rejection is a self-loop transition with `rejected: true`; `priority` higher wins; `total` gaps reported as internal `INCOMPLETE_TOTAL` because §42.2 has no code for the l.691 SHALL), MEDIUM, persisted rule-file keys. A catalog code for the total gap needs a human decision. Affects P013, P014, P007.
+- P002 STALLED after R03 (3 consecutive CHANGES_REQUESTED). Engine converged; 6 test-coverage gaps remain. See phases/P002-id-registry/ESCALATION.md. One retry is scheduled after the next acceptance. If it fails again, a human decides between a coverage waiver and narrowing the scope.
 - E-0006 (address grammar for observed targets and scope values): OPEN, HIGH reversibility. Decide before P007. Affects P007, P014, P016, P017, P020-P022, P024.
 
 ## Log
@@ -132,3 +134,9 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Foreman at f037d41: build ok, lint ok, KF_P012_BOUNDARY=1 npm test 817/817, P011 core unchanged, TRACEABILITY case ids resolve.
 - Accepted product SHA 23889a5. Scoreboard: §56 item 7 still PARTIAL (formula added); phases 3/28.
 - Per SKILL §6, a phase was accepted while P002 is pending R03; P002 is not STALLED, so no retry is triggered. Next secondary on Track B: P013 (state machine and narrative).
+
+## 2026-10-10 P002 audit R03 -> CHANGES_REQUESTED -> STALLED
+
+- Auditors: spec-compliance (all 15 prior findings FIXED; 1 test gap), integration-regression (no REQUIRED; clean clone 614/614 on Windows; Linux was not run because a Docker command was denied), test-conformance (52 mutants; 6 test gaps).
+- Six REQUIRED test-coverage gaps (T01-T06); the engine is correct in each. This is the third consecutive CHANGES_REQUESTED, so P002 is STALLED (PROTOCOL_V2 §8); ESCALATION.md written.
+- Scheduling: active_primary -> P013 (Track B, planning); active_secondary -> P028 (Track A, independent of P002). P002 is retried once after the next ACCEPTED.
