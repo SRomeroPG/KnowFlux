@@ -107,3 +107,9 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Fresh kf-implementer (remediation): F01-F04 fixed; 14 unit tests in test/p002-r02.test.mjs. Product commit 424a2bf.
 - Foreman verification: P002 tests + conformance 189/189; lint clean on P002 paths; auditor probes rerun: p1 (feature checkout) -> skipped not_canonical_tip; p2b -> GIT_FAILED; p6 -> concurrent edit preserved.
 - R03 plan (last round before STALLED): fresh spec-compliance + integration-regression + test-conformance auditors.
+
+## 2026-10-10 P012 implement R01 -> READY_FOR_AUDIT
+
+- Conformance slice 3936f12 (116 keys, 827 records); E-0037 decided (nested protecting guards; identity among known units).
+- kf-implementer R01: formula.mjs, decimal-ops.mjs, additive P011 exports (0 deletions; decimal/units/regex-re2 and all P011 tests byte-identical), 66 unit tests. Conformance enforced by the conformance engineer: 117/117 + F-E1 opt-in boundary gate passing.
+- Foreman at e5bc9f216f4638a715c4c260f37bbb2d6cd08a92: build ok, lint ok, npm test 798 (797 pass, 1 opt-in skip, 0 fail), diff --check clean. Product commit e5bc9f216f4638a715c4c260f37bbb2d6cd08a92.

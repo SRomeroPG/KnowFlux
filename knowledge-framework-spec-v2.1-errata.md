@@ -48,6 +48,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0034 | Permanent-renumber invalidity is judged at the alias's replay position (amends E-0024 (2)) | DECIDED_BY_FOREMAN | LOW | P002 |
 | E-0035 | P002 R02 remediation readings: later promote at the anchor, tip check with injected readers, skipped entities | DECIDED_BY_FOREMAN | LOW | P002, P007 |
 | E-0036 | P012 planning details: `KF-E-316` cascade, protection criterion, significant digits | DECIDED_BY_FOREMAN | LOW | P012, P014 |
+| E-0037 | P012 conformance readings: nested protecting guards; identity among known units | DECIDED_BY_FOREMAN | LOW | P012 |
 
 ---
 
@@ -998,3 +999,22 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 **Decided**: 2026-10-10 by Foreman (P012 planning)
 **Ratified**: pending
 **Affects.** P012, P014.
+
+---
+
+## E-0037 — P012 conformance readings: nested protecting guards; identity among known units
+
+**Clauses**
+- E-0036 (1) (unknown unit after `KF-E-316`, no cascade) and E-0036 (2) (semantic protection criterion); l.660 ("todos los operandos **SHALL** tener unidad idéntica").
+
+**Question.** The P012 conformance slice raised two points: (1) the P012 PLAN lists `{all: [{gain: {eq: "0"}}]}` and `{not: {gain: {ne: "0"}}}` as unprotecting guards, but both mention only `gain` and are true at zero; (2) how does the identity check treat an `add`/`subtract`/`min`/`max`/`clamp`/`if` whose operands include an unknown-unit operand (a `KF-E-316` subtree) in the first position?
+
+**Decision.**
+1. E-0036 (2) governs, so both guards protect. The PLAN row F-Zn4 is superseded for those two forms. Any predicate that mentions only R and evaluates true at R = zero protects, whatever its nesting (`all`, `any`, `not`).
+2. Operands of unknown unit are ignored by the identity check. The remaining known-unit operands must be identical to each other: the first known operand is the reference, and every other known operand that differs is one `KF-E-310`. If no operand has a known unit, the result is unknown.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 conformance)
+**Ratified**: pending
+**Affects.** P012.
