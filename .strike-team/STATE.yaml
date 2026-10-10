@@ -28,12 +28,12 @@ phases:
     audit_round: 3
     accepted_audit: .strike-team/phases/P001-core-persistent-model/audits/CLAUDE_AUDIT_R03.md
   P002:
-    status: REAUDITING
+    status: CHANGES_REQUESTED
     track: A
     depends_on: [P001]
     plan: .strike-team/phases/P002-id-registry/PLAN.md
     last_product_commit: 08b3910297e910fe64c1a15b01ff48c2fbe514e6
-    audit_round: 1
+    audit_round: 2
     accepted_audit: null
   P003:
     status: PLANNED
@@ -249,9 +249,9 @@ foreman:
   active_secondary: P012
   next_candidates: [P028, P011]
   last_run: 2026-10-10
-  consecutive_failed_rounds: {P002: 1}  # per phase; STALLED at 3
+  consecutive_failed_rounds: {P002: 2}  # per phase; STALLED at 3
 
-pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021, E-0022, E-0023, E-0024, E-0025, E-0026, E-0027, E-0028, E-0029]
+pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021, E-0022, E-0023, E-0024, E-0025, E-0026, E-0027, E-0028, E-0029, E-0030, E-0031, E-0032, E-0033, E-0034]
 open_decisions: [E-0006]
 open_spec_gaps: []
 

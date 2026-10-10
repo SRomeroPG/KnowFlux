@@ -41,6 +41,11 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0027 | P011 remediation readings: instruction counting, exact-ref ambiguity, single `KF-E-310` | DECIDED_BY_FOREMAN | LOW | P011 |
 | E-0028 | P002 remediation readings: alias anchor, conflicting alias repeats, lock owner fields, PLAN wording | DECIDED_BY_FOREMAN | LOW | P002 |
 | E-0029 | Promotion runs only at the canonical tip | DECIDED_BY_FOREMAN | LOW | P002, P007 |
+| E-0030 | Formula unit algebra and dimensionless values | DECIDED_BY_FOREMAN | MEDIUM | P012, P014 |
+| E-0031 | Formula refs, guards, `if`, and nulls | DECIDED_BY_FOREMAN | LOW | P012, P014, P007 |
+| E-0032 | Division, rounding, and the `KF-E-313` protection proof | DECIDED_BY_FOREMAN | LOW | P012, P014 |
+| E-0033 | Formula operator arity and diagnostics inventory | DECIDED_BY_FOREMAN | LOW | P012 |
+| E-0034 | Permanent-renumber invalidity is judged at the alias's replay position (amends E-0024 (2)) | DECIDED_BY_FOREMAN | LOW | P002 |
 
 ---
 
@@ -806,3 +811,140 @@ Residual risk: an uncommitted local allocation on a canonical-tip checkout can s
 **Decided**: 2026-10-10 by Foreman (P002 audit R02)
 **Ratified**: pending
 **Affects.** P002, P007.
+
+---
+
+## E-0030 — Formula unit algebra and dimensionless values
+
+**Clauses**
+- l.589: "Unidad declarada distinta de unidad recibida es ERROR (`KF-E-310`)." l.590: "Esto incluye pares matemáticamente convertibles."
+- l.658-663: "`add`, `subtract`, `min`, `max`, `clamp`: todos los operandos **SHALL** tener unidad idéntica; el resultado la conserva." / "`multiply`, `divide`: el resultado combina dimensiones. Si la dimensión resultante no existe en `units.yaml` → `KF-E-316`." / "`const` sin unidad es adimensional." / "La unidad calculada **SHALL** coincidir con `output.unit` → `KF-E-310`."
+- l.596-597: `units: - {id, dimension, symbol}` (a dimension is an opaque name).
+
+**Question.** `units.yaml` gives each unit only an opaque `dimension` name. What does "combine dimensions" mean, which unit does a product or quotient have, is "unidad idéntica" by id or by dimension, and how is a dimensionless value represented and matched against `output.unit`? (P012 triage T-01, T-07, T-09, T-16)
+
+**Decision.**
+1. Every formula value carries a **unit monomial**: a map from unit id to a non-zero integer exponent. The empty monomial is dimensionless. A `const` without `unit`, and a ref declared `type: decimal`, are dimensionless. A `const` with `unit` (it must be registered, `UNKNOWN_UNIT`) and a ref declared `type: quantity, unit: u` carry `{u: 1}`.
+2. `add`, `subtract`, `min`, `max`, `clamp`, and the two branches of `if`, require identical monomials. Identity is by unit id, never by dimension (l.590). A mismatch is `KF-E-310`. The result keeps the monomial.
+3. `multiply` and `divide` add or subtract exponents. The result is admissible only when its monomial is empty (dimensionless) or exactly one registered unit id with exponent 1. Any other result, such as `percent_mass²` or `ppm_mass/percent_mass`, has no unit in `units.yaml` and is `KF-E-316`, reported statically on that node. The engine never invents or converts a unit.
+4. Output check (l.663). If the computed monomial is `{u: 1}`, `output.unit` must equal `u`. If it is dimensionless, `output.unit` must name a registered unit whose `dimension` is the literal string `dimensionless`. Otherwise the result is `KF-E-310`.
+5. `abs` and `round` keep the monomial. Every unit check in this entry (`KF-E-310`, `KF-E-316`) is static, a function of the expression tree, the declared refs and the registry, and covers both branches of every `if`.
+
+**Rationale.** This is the only reading that needs no new `units.yaml` fields and allows no implicit conversion. The spec example checks: `percent_mass × (1 − dimensionless)` gives `percent_mass`.
+
+**Reversibility.** MEDIUM (fixes the meaning of `dimension: dimensionless` for dimensionless outputs).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 triage)
+**Ratified**: pending
+**Affects.** P012, P014.
+
+---
+
+## E-0031 — Formula refs, guards, `if`, and nulls
+
+**Clauses**
+- l.644-652 (example: refs without type; `guards: - when: {DE-0017.loss_factor: {gte: "1"}}  raise: OUT-0011`).
+- l.657: "`if` toma `{cond: predicate, then: expr, else: expr}`."
+- l.606-607: "`null` **SHALL** significar "ausente", nunca "cero" ni "falso"." / "Toda comparación con un operando `null` evalúa a `false`, salvo `is_null`."
+- E-0019 (binding, predicate semantics), E-0022 D-01/D-02.
+
+**Question.** How do refs get a type and unit when a formula declares no inputs? What are guard order and result? How do `if` and `null` operands behave? (T-02, T-06, T-10, T-13, T-15)
+
+**Decision.**
+1. **Refs.** Check and evaluate take a caller-supplied `inputs` list with the same shape as decision-table `inputs[]` (`{ref, type, unit?, domain?}`; the types of E-0021). The persisted formula format is unchanged; P007/P014 build the list from the entity model. Expression refs, guard keys, `if` conditions and supplied values bind by the E-0019 rule (full ref or last-`.` suffix; `UNBOUND_FIELD` / `AMBIGUOUS_FIELD`). Only `quantity` and `decimal` inputs may appear as expression operands (`TYPE_MISMATCH` otherwise). Predicates may use every input type, with the P011 semantics, including `KF-E-310/314/315`.
+2. **Guards.** They are evaluated in document order, before the expression. The first guard whose `when` is true ends evaluation with `{status: 'raised', outcome: <OUT-id>, value: null}`. No later guard and no part of the expression is evaluated. `when` follows P011 predicate semantics; an empty mapping is `EMPTY_PREDICATE`. `raise` is checked only against its pattern; whether the `OUT` entity exists is P007.
+3. **`if`.** Evaluation is lazy: only the selected branch is evaluated. A `cond` that compares against `null` is false (l.607), so the `else` branch runs. Static checks (units, `KF-E-313`, `KF-E-316`) cover both branches.
+4. **Null.** An absent or `null` operand makes the result of the arithmetic operation that uses it `null`. This propagates to the formula value: `{status: 'ok', value: null}`. A null is never treated as zero (l.606). A `null` divisor gives `null`, not `KF-E-313`. Final rounding of `null` is `null`.
+
+**Reversibility.** LOW (API shape and evaluation rules; no persisted format).
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 triage)
+**Ratified**: pending
+**Affects.** P012, P014, P007.
+
+---
+
+## E-0032 — Division, rounding, and the `KF-E-313` protection proof
+
+**Clauses**
+- l.584: "El redondeo **SHALL** declararse explícitamente donde se aplique: `rounding: {mode: half-even | half-up | down | up, decimals: N}`. Sin declaración, no hay redondeo."
+- l.585: "División por cero → `KF-E-313` en validación, o el `guard` declarado en tiempo de evaluación."
+- l.634: "Nada de SAT solver disfrazado de Knowledge Framework." l.1768: "| `KF-E-313` | E | División por cero no protegida | añadir `guard` |"
+- l.1955: "decimal_precision: 28"; E-0017; E-0022 D-04.
+
+**Question.** Where does rounding apply, and what does the `round` operator take? How are inexact quotients computed? When is a division "protected", without a solver? (T-03, T-04, T-05, T-11, T-12)
+
+**Decision.**
+1. **Rounding placement.** The logic-level `rounding` is applied exactly once, to the final non-null result. Intermediate `add`, `subtract` and `multiply` are exact. The `round` operator takes exactly one argument and applies the logic-level `rounding` at that point. If a formula uses `round` without a `rounding` block, that is the typed error `INVALID_EXPRESSION`.
+2. **Modes.** `half-even`: ties to even. `half-up`: ties away from zero. `down`: toward zero. `up`: away from zero. `decimals` is a non-negative integer with no cap. A rounded result is rendered with exactly `decimals` fraction digits, trailing zeros kept, and a negative zero renders as non-negative.
+3. **Division.** An exact quotient (a terminating decimal of at most `precision` significant digits) is returned exactly. For an inexact quotient:
+   - with a `rounding` block, it is rounded to `precision` significant digits using the declared `mode`, then rounded again at the end per (1);
+   - without a `rounding` block, it is the typed error `INEXACT_DIVISION` (l.584).
+   `precision` is an explicit option with default 28 (l.1955); P007 wires the configuration value.
+4. **Protection proof (static).** A `divide` node is protected when one of these holds:
+   - (a) its divisor is a constant that is not zero;
+   - (b) its divisor is a bare `ref` R, and some guard's `when` is a single matcher on R that is true whenever R equals zero: `eq`/literal `"0"` (or the zero quantity in R's unit), `in` containing it, `lte`/`gte`/`between` whose range contains 0, or `is_null` combined in an `any` with one of those;
+   - (c) the node lies in the `then` branch of an `if` whose `cond` is a single matcher on R that is false whenever R equals zero (`ne "0"`, `gt "0"`, `lt "0"`, `not_in` containing `"0"`), or in the `else` branch of an `if` whose `cond` is true whenever R equals zero.
+   A constant zero divisor is never protected. Every other divisor (compound expressions, refs without such a guard or condition) is unprotected, which is `KF-E-313` (fail closed, no solver). This proof is only syntactic and per-field, in the style of E-0020 (b).
+5. **Static findings block evaluation.** If a formula has static findings (`KF-E-310`, `KF-E-313`, `KF-E-316`, or predicate findings), evaluation returns `status: 'error'` with those findings and evaluates nothing. A runtime zero divisor is then unreachable. If it happens anyway, it is the typed error `DIVISION_BY_ZERO` (defensive).
+6. **Size limits.** There is no digit cap. Expression nesting depth is limited to 1000 (`INVALID_EXPRESSION` beyond that), the same limit as P011 predicates.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 triage)
+**Ratified**: pending
+**Affects.** P012, P014.
+
+---
+
+## E-0033 — Formula operator arity and diagnostics inventory
+
+**Clauses**
+- l.656: "Operadores: `add · subtract · multiply · divide · min · max · abs · round · clamp · if`." (no arities)
+- §42.2 l.1765-1771; E-0014 / E-0022 D-01 (typed internal codes for failures without a catalog code).
+
+**Question.** Operator arities, and which failures are `KF-` diagnostics versus typed errors. (T-08, T-14)
+
+**Decision.**
+- **Arity.**
+  - `subtract` and `divide`: exactly 2 arguments.
+  - `add`, `multiply`, `min`, `max`: one or more; one argument returns it unchanged, and longer lists fold left.
+  - `abs` and `round`: exactly 1.
+  - `clamp`: exactly 3, `(x, lo, hi)`. A runtime `lo > hi` is `INVALID_RANGE`.
+  - Any other arity, an unknown `op`, or a malformed node is `INVALID_EXPRESSION`.
+- **Diagnostics.**
+  - Returned `KF-` diagnostics (sorted with the P011 key and located by JSON pointer):
+    - `KF-E-310` (units, the output check, predicate literals);
+    - `KF-E-313`;
+    - `KF-E-316`;
+    - `KF-E-314` and `KF-E-315` (from predicates);
+    - `KF-E-312`/`KF-E-311` never apply.
+    `logic-diagnostics.mjs` gains the catalog rows for `KF-E-313` (remediation "añadir `guard`") and `KF-E-316`.
+  - Thrown typed errors: `INVALID_EXPRESSION`, `INEXACT_DIVISION`, `DIVISION_BY_ZERO`, `INVALID_RANGE`, plus the P011 codes (`UNKNOWN_UNIT`, `UNBOUND_FIELD`, `AMBIGUOUS_FIELD`, `TYPE_MISMATCH`, `INVALID_DECIMAL`, `EMPTY_PREDICATE`, `INVALID_TABLE`→ for formulas `INVALID_EXPRESSION`).
+  - `KF-E-010` is never emitted (E-0022 D-01).
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P012 triage)
+**Ratified**: pending
+**Affects.** P012.
+
+---
+
+## E-0034 — Permanent-renumber invalidity is judged at the alias's replay position (amends E-0024 (2))
+
+**Clauses**
+- l.318: "**Un ID `permanent` SHALL NOT ser renumerado jamás.**"
+- E-0024 (2); E-0004 (a recorded `move` is legitimate continuity); E-0029 (promotion only at the canonical tip).
+
+**Question.** P002 audit R02 (D01) found two orderings of the same events treated differently. As E-0024 (2) is written, the comparison uses the *final* holder path of `alias.from`. Take a registry where X is promoted at A, the loser at B is renumbered X→Y, the loser later leaves B, and X is then moved to B with a recorded `move`. That registry becomes permanently invalid, even though the move is legitimate path reuse and the registry is append-only.
+
+**Decision.** The E-0024 (2) check is made at the `alias` event's position in replay order. The alias is invalid iff, at that position, `alias.from` already has a `promote` and its holder path (the promote path followed through the `move` events replayed so far) equals the alias's anchor path. Later `move` events of `alias.from`, including a move into the former anchor path, do not retroactively invalidate the alias. The anchor itself stays as E-0028 (1) defines it.
+
+**Rationale.** It distinguishes "renumbered a permanent holder", which is invalid, from "a permanent entity later reused a path", which is legitimate. Under E-0029, promotion and renumbering are computed only from canonical state, so the engine cannot produce a union-merge reordering that would hide a real conflict.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 audit R02)
+**Ratified**: pending
+**Affects.** P002.

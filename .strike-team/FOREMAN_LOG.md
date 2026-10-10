@@ -88,3 +88,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Foreman at 023daae: build ok, lint ok, npm test 587/587, TRACEABILITY references verified (102 title refs, 128 case ids).
 - Accepted product SHA 0e8f741. Scoreboard: §56 item 7 PARTIAL; phases 2/28. §55 lines unchanged (no CLI yet).
 - Next secondary on Track B: P012 (Formula Logic), eligible (depends on P011).
+
+## 2026-10-10 P002 audit R02 -> CHANGES_REQUESTED (consecutive 2/3)
+
+- Re-audit: spec-compliance (F01-F10 all FIXED; 41 mutants; fuzz) and architecture (deferred from R01).
+- New REQUIRED: F01 MEDIUM promotion from a non-canonical checkout bricks the merged registry -> E-0029 (promotion only at the canonical tip); F02 MEDIUM git reader maps object-read failure to "absent"; F03 LOW concurrent entity edits lost; F04 LOW permanent-renumber check uses final holder path -> E-0034; F05 LOW test gap (E-0024 (3) "otherwise none"). Foreman reproduced F01, F02, F03.
+- P002 is at 2 consecutive CHANGES_REQUESTED; a third sets STALLED (PROTOCOL_V2 §8). R03 will run all remaining auditor angles (integration-regression added) to avoid late discoveries.
+- P011 accepted earlier; P012 opened (triage -> E-0030..E-0033; planner running).
