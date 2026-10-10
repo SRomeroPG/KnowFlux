@@ -68,3 +68,10 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Auditors: spec-compliance, algorithm-determinism, test-conformance (sonnet, fresh, blind pass confirmed). Architecture and integration-regression auditors deferred to R02.
 - 10 REQUIRED findings: F01 MEDIUM union merge of idempotent promotions invalidates the registry (defect in E-0012; fixed by E-0024); F02 MEDIUM id_alias erased after move; F03/F04 LOW (permanent renumber accepted; canonical ref = any revision, tag shadows branch); F05-F10 test gaps (surviving mutants) and E-0024 cases. Foreman reproduced F01-F04.
 - Remediation: fresh conformance engineer first, then fresh implementer.
+
+## 2026-10-10 P002 remediate R01 -> hand off R02
+
+- Fresh kf-conformance-engineer: 21 tests / 10 case keys for F01-F10 (bb0e79e), 11 red before the fix. Six residual readings decided as E-0028.
+- Fresh kf-implementer (remediation): F01-F04 fixed under E-0024/E-0028; 22 unit tests in test/p002-remediation.test.mjs (12 red on the old engine). Product commit 08b3910.
+- Foreman verification: P002 test files + conformance 162/162; lint clean on P002 paths; the four R01 reproductions (repro-d01, repro-p002 F01/F02, repro-d03) now show the corrected behavior.
+- Errata E-0027 (P011 remediation readings) and E-0028 committed with this handoff.

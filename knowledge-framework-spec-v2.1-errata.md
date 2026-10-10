@@ -38,6 +38,8 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0024 | Registry replay after real merges; alias projection across moves; canonical ref resolution (amends E-0012, E-0016) | DECIDED_BY_FOREMAN | MEDIUM | P002, P007 |
 | E-0025 | Absent inputs in the static proofs; "bare scalar" in the unit rule (amends E-0020, clarifies E-0019) | DECIDED_BY_FOREMAN | LOW | P011, P014 |
 | E-0026 | Literal `null` operands in `ne`, `in`, `not_in`; regex program size counts the final match | DECIDED_BY_FOREMAN | LOW | P011, P014 |
+| E-0027 | P011 remediation readings: instruction counting, exact-ref ambiguity, single `KF-E-310` | DECIDED_BY_FOREMAN | LOW | P011 |
+| E-0028 | P002 remediation readings: alias anchor, conflicting alias repeats, lock owner fields, PLAN wording | DECIDED_BY_FOREMAN | LOW | P002 |
 
 ---
 
@@ -732,3 +734,45 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P011 audit R01)
 **Ratified**: pending
 **Affects.** P011, P014.
+
+---
+
+## E-0027 — P011 remediation readings: instruction counting, exact-ref ambiguity, single `KF-E-310`
+
+**Clauses**
+- E-0019 ("a suffix shared by two inputs" → `AMBIGUOUS_FIELD`; quantity vs bare scalar → `KF-E-310`), E-0022 D-05 / E-0026 (2) (program-size cap), E-0025 (3).
+
+**Question.** Three readings the P011 R01 remediation cases rely on: (1) how instructions are counted at the 100000 boundary; (2) whether a key equal to one input's full ref is still ambiguous when another input shares it as suffix; (3) whether a quantity literal on an `enum` input yields `KF-E-310` alone or also `KF-E-314`, and whether a supplied quantity on a non-quantity input is `KF-E-310`.
+
+**Decision.**
+1. For the boundary cases: each literal/class/`.` atom copy is one instruction, a non-capturing group adds none, and the final match is one (so `(?:a{1000}){99}a{999}` is exactly 100000). Other constructs' counts are implementation-defined, provided the cap bounds compile time and memory (P011 R01 F01/F02).
+2. Yes: with inputs `x` and `A.x`, the key `x` is `AMBIGUOUS_FIELD`; `A.x` binds by full ref.
+3. A quantity literal on an `enum`/`string`/`boolean` input yields exactly one `KF-E-310` (no `KF-E-314`: domain membership applies to scalar values). A supplied quantity for an `enum`/`string`/`boolean` input is `KF-E-310` with `expected_unit: null` ("either direction", E-0025 (3)).
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 R01 remediation)
+**Ratified**: pending
+**Affects.** P011.
+
+---
+
+## E-0028 — P002 remediation readings: alias anchor, conflicting alias repeats, lock owner fields, PLAN wording
+
+**Clauses**
+- E-0015 D-02(c) ("for each loser ... an `allocate` of the new ID followed by its `alias`"); E-0013 (owner file `{pid, host, acquired_at}`); E-0024 (1), (3), (4).
+
+**Question.** Residual points from the P002 R01 remediation cases: (1) which `allocate Y` anchors an alias X→Y when Y has several; (2) two `alias` lines with the same `from` and `to` but different `commit`; (3) whether the owner file uses injected `now`/`hostname`; (4) the PLAN's stale "accepts `origin/main`" wording; (5) whether `readIdRegistry` deduplicates exact repeats.
+
+**Decision.**
+1. The anchor is the nearest `allocate Y` that precedes the `alias` line in file order (the renumbering writes them adjacently, D-02(c), and a union merge preserves each side's relative order). An `alias` with no preceding `allocate Y` makes the registry invalid. This replaces any "else the nearest one after" fallback.
+2. Same `from` and `to` with a different `commit` is a conflicting event: `INVALID_REGISTRY` (only exact repeats are idempotent, E-0024 (1)).
+3. When `now` / `hostname` are injected, the engine writes those values into `owner.json` (so the staleness test compares like with like); otherwise the real clock (ISO-8601 UTC) and `os.hostname()`.
+4. E-0024 (4) supersedes the PLAN text: `origin/main` given as a name is `CANONICAL_BRANCH_UNRESOLVED`; the remote-tracking branch is reached only through the fallback `refs/remotes/origin/<name>` for a plain branch name.
+5. Implementation-defined; callers must not depend on whether exact repeats appear in the returned list.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P002 R01 remediation)
+**Ratified**: pending
+**Affects.** P002.
