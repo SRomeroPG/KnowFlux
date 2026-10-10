@@ -27,6 +27,7 @@ import {
   ALL_INPUTS, C, FX, K, NUL, OK, Q, add, clone, deepFreeze, divide, iff, multiply, permuteKeys, ref, rnd, vals, valsBySuffix,
 } from '../framework/conformance/p012-formula/builders.mjs';
 import { GROUPS, K1_PAIRS, L1_NULL_VARIANTS } from '../framework/conformance/p012-formula/cases.mjs';
+import { R01_GROUPS } from '../framework/conformance/p012-formula/cases-r01.mjs';
 import { w5Cases, wGroups } from '../framework/conformance/p012-formula/cases-w.mjs';
 import { payload } from '../framework/conformance/p012-formula/determinism-child.mjs';
 import { buildOptions, execCase, plain } from '../framework/conformance/p012-formula/exec.mjs';
@@ -42,7 +43,7 @@ const readYaml = async (...parts) => YAML.parse(await fs.readFile(path.join(...p
 const ENTRY_SHA = 'c10ae95d828847c79589535b1bb31c0fd7153242'; // the commit the P011 surface is pinned to (PLAN F-E2)
 
 const INDEX = await readYaml(CONF, 'p012-formula.yaml');
-const REGS = { uf0: await readYaml(DATA, 'units-uf0.yaml'), uf1: await readYaml(DATA, 'units-uf1.yaml'), uf2: await readYaml(DATA, 'units-uf2.yaml') };
+const REGS = { uf0: await readYaml(DATA, 'units-uf0.yaml'), uf1: await readYaml(DATA, 'units-uf1.yaml'), uf2: await readYaml(DATA, 'units-uf2.yaml'), ufz: await readYaml(DATA, 'units-ufz.yaml') };
 const ROUNDING = await readYaml(DATA, 'rounding.yaml');
 const DEC_OPS = await readYaml(DATA, 'decimal-ops.yaml');
 
@@ -289,7 +290,7 @@ DYNAMIC.push({
   ],
 });
 
-for (const { key, title, cases } of [...GROUPS.entries()].map(([k, g]) => ({ key: k, ...g })).concat(W_GROUPS, DYNAMIC)) {
+for (const { key, title, cases } of [...GROUPS.entries(), ...R01_GROUPS.entries()].map(([k, g]) => ({ key: k, ...g })).concat(W_GROUPS, DYNAMIC)) {
   check(key, title, () => runAll(key, cases));
 }
 
@@ -425,7 +426,7 @@ check('F-K1', 'each in-scope code has a positive input and a near-miss; no case 
 });
 
 // ============================================================================================ F-S determinism, purity, shape, constants
-const ALL_CASES = [...GROUPS.values()].flatMap((g) => g.cases).concat(W_GROUPS.flatMap((g) => g.cases), W5_CASES);
+const ALL_CASES = [...GROUPS.values(), ...R01_GROUPS.values()].flatMap((g) => g.cases).concat(W_GROUPS.flatMap((g) => g.cases), W5_CASES);
 check('F-S2a', 'key order of every mapping (nodes, output, rounding, guards, when, inputs, values) does not change any result (PLAN F-S2; design: no iteration-order dependence)', () => {
   assert.ok(ALL_CASES.length > 300, 'the slice has hundreds of cases');
   const F = mod('formula');
@@ -735,6 +736,82 @@ check('F-P2', 'no binary float, clock, randomness, I/O, eval or host RegExp in t
   for (const file of ['formula.mjs', 'decimal-ops.mjs', 'decision-table.mjs']) {
     const source = await sourceOf(file);
     for (const pattern of [/new\s+RegExp/, /\bRegExp\(/, /\.match\(/, /\.exec\(/, /\.test\(/]) assert.doesNotMatch(source, pattern, `${file} contains ${pattern}`);
+  }
+});
+
+// ============================================================================================ audit R01 remediation: D01 sparse arrays
+// Holes cannot be written in JSON/YAML data and `clone` would turn them into null, so these arrays are built here and passed
+// to the public API as they are. Expected (AUDIT_R01 D01; E-0033 "a malformed node is INVALID_EXPRESSION"; typed errors are the
+// failure channel, E-0014 / E-0022 D-01): LogicError INVALID_EXPRESSION from checkFormula AND evaluateFormula, never a TypeError.
+const holes = (length, fill = {}) => {
+  const list = new Array(length);
+  for (const [index, value] of Object.entries(fill)) list[Number(index)] = value;
+  return list;
+};
+const SPARSE_X = { loss_factor: { eq: '1' } };
+const sparseGuard = (when) => ({ ...FX(rf), guards: [{ when, raise: 'OUT-0001' }] });
+const sparseCond = (cond) => FX(iff(cond, rf, ref('g')));
+const SPARSE_SHAPES = [
+  ['{all: [hole, x]}', () => ({ all: holes(2, { 1: SPARSE_X }) })],
+  ['{all: [x, hole]}', () => ({ all: holes(2, { 0: SPARSE_X }) })],
+  ['{any: new Array(2)}', () => ({ any: holes(2) })],
+  ['{all: new Array(1)}', () => ({ all: holes(1) })],
+  ['{any: [x, hole, x]}', () => ({ any: holes(3, { 0: SPARSE_X, 2: SPARSE_X }) })],
+  ['{all: [{any: new Array(2)}]}', () => ({ all: [{ any: holes(2) }] })],
+  ['{not: {all: [hole, x]}}', () => ({ not: { all: holes(2, { 1: SPARSE_X }) } })],
+];
+check('F-RM-D01', 'sparse predicate arrays ({all: [ , x]}, {any: new Array(2)}, also inside an if cond) are LogicError INVALID_EXPRESSION from check and evaluate, never a raw TypeError (E-0033; E-0014; AUDIT_R01 D01)', () => {
+  const F = mod('formula');
+  const options = baseOptions();
+  for (const [name, make] of SPARSE_SHAPES) {
+    for (const [where, build] of [['guard', () => sparseGuard(make())], ['if cond', () => sparseCond(make())]]) {
+      for (const [fn, call] of [['checkFormula', (logic) => F.checkFormula(logic, options)], ['evaluateFormula', (logic) => F.evaluateFormula(logic, vals({ f: '1', g: '2', b: true }), options)]]) {
+        let caught = null;
+        try {
+          call(build());
+        } catch (error) {
+          caught = error;
+        }
+        assert.ok(!(caught instanceof TypeError), `${name} in a ${where} via ${fn}: no raw TypeError (${caught?.message})`);
+        try {
+          assertLogicError(caught, 'INVALID_EXPRESSION');
+        } catch (error) {
+          error.message = `[${name} in a ${where} via ${fn}] ${error.message}`;
+          throw error;
+        }
+      }
+    }
+  }
+  // near-miss: the same shapes without holes are accepted
+  assert.deepEqual(F.checkFormula(sparseGuard({ all: [SPARSE_X, SPARSE_X] }), options), []);
+  assert.deepEqual(F.checkFormula(sparseCond({ any: [SPARSE_X, SPARSE_X] }), options), []);
+});
+
+check('F-RM-D01b', 'a sparse args list of an operator is a malformed node: INVALID_EXPRESSION from check and evaluate, never a raw TypeError (E-0033 "args containing 1, null, ..."; AUDIT_R01 D01 neighbour)', () => {
+  const F = mod('formula');
+  const options = baseOptions();
+  const shapes = [
+    ['{op: add, args: new Array(2)}', () => ({ op: 'add', args: holes(2) })],
+    ['{op: add, args: [hole, 1]}', () => ({ op: 'add', args: holes(2, { 1: { const: '1' } }) })],
+    ['{op: add, args: [f, hole]}', () => ({ op: 'add', args: holes(2, { 0: rf }) })],
+    ['{op: abs, args: new Array(1)}', () => ({ op: 'abs', args: holes(1) })],
+  ];
+  for (const [name, make] of shapes) {
+    for (const [fn, call] of [['checkFormula', (logic) => F.checkFormula(logic, options)], ['evaluateFormula', (logic) => F.evaluateFormula(logic, vals({ f: '1' }), options)]]) {
+      let caught = null;
+      try {
+        call(FX(make()));
+      } catch (error) {
+        caught = error;
+      }
+      assert.ok(!(caught instanceof TypeError), `${name} via ${fn}: no raw TypeError (${caught?.message})`);
+      try {
+        assertLogicError(caught, 'INVALID_EXPRESSION');
+      } catch (error) {
+        error.message = `[${name} via ${fn}] ${error.message}`;
+        throw error;
+      }
+    }
   }
 });
 

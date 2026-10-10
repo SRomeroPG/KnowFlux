@@ -1,0 +1,9 @@
+# Registry UFZ (R01 remediation, T04): ids chosen so that UTF-8 byte order and locale order differ.
+# Byte order: "Zeta" < "alpha" < "beta" (0x5A < 0x61 < 0x62). A localeCompare sort gives alpha, beta, Zeta.
+# Source: P012 audit R01 F-P012-R01-T04; PLAN "Unit text" (factors sorted by unit id in UTF-8 byte order).
+units:
+  - {id: Zeta, dimension: zdim, symbol: "Z"}
+  - {id: alpha, dimension: adim, symbol: "a"}
+  - {id: beta, dimension: bdim, symbol: "b"}
+  - {id: ratio, dimension: dimensionless, symbol: "1"}
+conversions: []

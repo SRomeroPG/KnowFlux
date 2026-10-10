@@ -148,6 +148,23 @@ case_index:
   F-N1: {targets: [V-34], cites: ["E-0032 (6)", "PLAN N-07"], expect: "500 nested evaluates; 1100 INVALID_EXPRESSION, no RangeError (add and if chains)"}
   F-N2: {targets: [V-34], cites: ["E-0033", "PLAN N2"], expect: "5000-argument add/min/max"}
   F-N3: {targets: [V-34], cites: ["spec l.582", "PLAN N3"], expect: "2000-digit multiply and 5000-digit round trip within 5 s"}
+  # ------------------------------------------------------------------------------- audit R01 remediation (cases-r01.mjs)
+  # Written at base 0bed128 from the spec, errata E-0030..E-0033 and E-0036..E-0038, the PLAN and AUDIT_R01.md only, BEFORE
+  # any remediation code and without opening formula.mjs, decimal-ops.mjs or test/p012-*. Existing keys above are unchanged.
+  F-RM-T01: {targets: [V-22], cites: ["E-0032 (1)", "AUDIT_R01 T01", "PLAN R-02"], expect: "nested add/subtract/multiply/min/max/abs/clamp/exact divide are never rounded before the single final rounding (half-up, up, down, half-even; decimals and quantities)"}
+  F-RM-T02: {targets: [V-11], cites: ["E-0030 (3)", "E-0033 (left fold)", "AUDIT_R01 T02"], expect: "n-ary multiply folds the unit monomial over every argument: multiply(c,f,p) -> KF-E-316 percent_mass*ppm_mass; multiply(f,g,c) output percent_mass -> []"}
+  F-RM-T03: {targets: [V-30, V-24], cites: ["PLAN Diagnostic sort key (applied to every returned list)", "AUDIT_R01 T03"], expect: "supplied-value findings sorted by (code, pointer) in byte order: [310 /inputs/1, 314 /inputs/0]; /inputs/10 before /inputs/2 with 12 inputs"}
+  F-RM-T04: {targets: [V-11, V-30], cites: ["PLAN Unit text (UTF-8 byte order)", "PLAN determinism constraint", "AUDIT_R01 T04"], expect: "ids Zeta and alpha: unit text Zeta*alpha (also divide, three ids, argument order irrelevant)"}
+  F-RM-T05: {targets: [V-11, V-29], cites: ["E-0036 (1)", "E-0037 (2)", "AUDIT_R01 T05"], expect: "if with an unknown-unit then/else branch: KF-E-316 at the branch plus KF-E-310 at /output/unit from the known branch; sorted by (code, pointer)"}
+  F-RM-T06: {targets: [V-34], cites: ["E-0032 (6)", "E-0038 (2)", "AUDIT_R01 T06"], expect: "root = depth 1: depth 1000 accepted and evaluated, depth 1001 INVALID_EXPRESSION from check and evaluate (add/if/abs chains, side branch)"}
+  F-RM-T07: {targets: [V-04], cites: ["PLAN P-10", "schema ^OUT-[0-9]{4,}$", "AUDIT_R01 T07"], expect: "raise OUT-123, OUT-0 and shorter are INVALID_EXPRESSION; OUT-1234, OUT-0000 accepted"}
+  F-RM-D01: {targets: [V-16, V-38], cites: ["E-0033 (malformed node is INVALID_EXPRESSION)", "E-0014", "E-0022 D-01", "AUDIT_R01 D01"], expect: "sparse predicate arrays in guards and if conds throw LogicError INVALID_EXPRESSION from check and evaluate, never a raw TypeError"}
+  F-RM-D01b: {targets: [V-04, V-38], cites: ["E-0033 (args containing non-nodes)", "AUDIT_R01 D01 neighbour"], expect: "sparse args lists of operators are INVALID_EXPRESSION, never a raw TypeError"}
+  F-RM-D01c: {targets: [V-16], cites: ["E-0033 (malformed node)", "AUDIT_R01 D01"], expect: "null elements in all/any arrays of guards and if conds are INVALID_EXPRESSION; clean arrays accepted"}
+  F-RM-E38a: {targets: [V-03, V-20], cites: ["E-0038 (1)", "E-0038 (3)", "E-0033 (clamp lo > hi INVALID_RANGE)"], expect: "clamp(null, 2, 1) INVALID_RANGE at evaluation only (also nested, with a rounding block); null lo/hi or lo <= hi gives ok null"}
+  F-RM-E38b: {targets: [V-20, V-23], cites: ["E-0038 (1)", "E-0032 (3)", "E-0031 (3)"], expect: "add(null_ref, divide(1,3)) without a rounding block is INEXACT_DIVISION (all binary ops, nested); with a rounding block ok null; exact or null-numerator divisions give ok null; if stays lazy"}
+  F-RM-A1: {targets: [V-04], cites: ["PLAN Structure (output: ref and unit)", "E-0033 (malformed node)", "AUDIT_R01 advisory"], expect: "an extra key in output is INVALID_EXPRESSION; exact ref+unit accepted"}
+
   # -------------------------------------------------------------------------------------------- P011 non-regression
   F-E1: {targets: [V-35], cites: ["PLAN F-E1"], expect: "no expected/, acme, spec-examples, schemas, bin, package.json, eslint change (opt-in git status gate KF_P012_BOUNDARY=1)"}
   F-E2a: {targets: [V-35], cites: ["PLAN F-E2", "PLAN P-01", "PLAN P-02"], expect: "decimal/units/regex-re2 and every P011 test/fixture byte-identical to c10ae95"}
