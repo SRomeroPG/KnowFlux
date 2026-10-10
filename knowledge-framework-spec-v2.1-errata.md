@@ -33,6 +33,7 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0019 | Decision-table matching semantics: binding, types, units, nulls, enums | DECIDED_BY_FOREMAN | MEDIUM | P011, P012, P014 |
 | E-0020 | Hit policies, `default`, overlap proof, exhaustiveness proof | DECIDED_BY_FOREMAN | LOW | P011, P014 |
 | E-0021 | RE2 dialect in a Node engine; outputs and uncatalogued failures | DECIDED_BY_FOREMAN | LOW | P011, P012, P013, P014 |
+| E-0022 | Decision-table details from P011 planning (amends E-0019 on `when: {}`) | DECIDED_BY_FOREMAN | LOW | P011, P012, P014 |
 
 ---
 
@@ -532,7 +533,7 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Question.** How `when` keys bind to `inputs[]`; operator/type rules; unit mismatches; null and absent inputs; out-of-domain enum values outside scenarios. (T-02, T-04, T-05, T-09)
 
 **Decision.**
-- Binding: a `when` field key matches an input whose `ref` equals the key, or whose `ref` suffix after the last `.` equals the key. A key matching no input, or a suffix shared by two inputs, is a typed error (`UNBOUND_FIELD` / `AMBIGUOUS_FIELD`). Several keys in one predicate mapping are a conjunction. An empty predicate mapping `{}` is a typed error (`EMPTY_PREDICATE`); the only unconditional row is `when: default` (E-0020).
+- Binding: a `when` field key matches an input whose `ref` equals the key, or whose `ref` suffix after the last `.` equals the key. A key matching no input, or a suffix shared by two inputs, is a typed error (`UNBOUND_FIELD` / `AMBIGUOUS_FIELD`). Several keys in one predicate mapping are a conjunction. An empty predicate mapping `{}` is a typed error (`EMPTY_PREDICATE`); the only unconditional row is `when: default` (E-0020). *(Amended by E-0022 (D-08): a top-level `when: {}` is an unconditional non-default row; `{}` nested inside `all`/`any`/`not` stays `EMPTY_PREDICATE`.)*
 - Literal matcher means `eq`. `eq`, `ne`, `in`, `not_in` compare strings, booleans and enum values exactly (case-sensitive, code-point equality) and decimals/quantities by value (E-0017). `lt`, `lte`, `gt`, `gte`, `between` apply only to decimal and quantity inputs; any other operand type is a typed error `TYPE_MISMATCH`. `between` with `min > max` is a typed error.
 - Units: a quantity is comparable only with a quantity of the identical unit id. A different unit id, or a quantity against a bare scalar (either direction), is `KF-E-310` — both statically (a literal in `when` versus the input's declared `unit`, reported by the table check) and at evaluation (a supplied value versus the declared `unit`). Never coerced, never `false`.
 - Null: binary logic. An input absent from the supplied values is `null`. Every matcher except `is_null` evaluates to `false` on a `null` operand, including `ne` and `not_in`; `eq: null` is `false`; `is_null: true` is the only test for absence. `not` negates the boolean result of its predicate (so `not: {x: {eq: 1}}` is `true` when `x` is null).
@@ -601,3 +602,34 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P011 triage)
 **Ratified**: pending
 **Affects.** P011, P012, P013, P014.
+
+---
+
+## E-0022 — Decision-table details from P011 planning (amends E-0019 on `when: {}`)
+
+**Clauses**
+- l.620: "predicate := { field: matcher } | { all: [predicate] } | { any: [predicate] } | { not: predicate }"
+- l.584: "El redondeo **SHALL** declararse explícitamente donde se aplique ... Sin declaración, no hay redondeo."
+- l.612: "Dialecto **RE2** (sin backreferences ni lookaround, sin backtracking catastrófico)."
+- l.634: "... en cuyo caso el engine enumera y prueba cobertura total."
+- Accepted P001 format: `framework/schemas/logic.schema.json` l.56 admits a rule `when` that is `"default"`, an object with `maxProperties: 0`, or a predicate; the accepted fixture `acme-formulation/knowledge/business-rules/BR-0001/observed/legacy-app.yaml` l.14 uses `when: {}`.
+
+**Question.** Eight details the P011 planner found undetermined (P011 `TRIAGE.md` D-01..D-08), one of which (D-08) shows that E-0019's "`{}` is `EMPTY_PREDICATE`" contradicts the accepted P001 format.
+
+**Decision.**
+- (D-08, amends E-0019) A rule whose top-level `when` is the empty mapping `{}` is an **unconditional row**: a conjunction of zero field conditions, which matches every input. It is not a `default` row: it takes part in hit policies like any other non-default row, it overlaps every other non-default row under `unique` (`KF-E-312`), and it does not satisfy the "fila `when: default`" requirement of l.634 (it covers every tuple when enumeration applies). An empty mapping anywhere *inside* `all`/`any`/`not` remains `EMPTY_PREDICATE`. The rest of E-0019 stands.
+- (D-01) P011 functions assume input that is valid against the P001 schemas; they do not run JSON Schema validation and never emit `KF-E-010`. Structurally invalid input that reaches them is a typed error `INVALID_TABLE`. Schema validation belongs to `kf validate` (P028/P007).
+- (D-02) Supplied evaluation values bind to inputs by the same rule as `when` keys (full `ref` or suffix after the last `.`). A supplied key that binds to no input is `UNBOUND_FIELD`; two supplied keys binding to the same input, or one key binding to two inputs, are `AMBIGUOUS_FIELD`.
+- (D-03) `all: []` and `any: []` are `EMPTY_PREDICATE`.
+- (D-04) Division is removed from P011 scope; P012 (formula) decides inexact quotients together with `rounding`. P011's decimal module exposes only exact operations.
+- (D-05) RE2 fine print, following RE2 defaults for every construct E-0021 lists: `.` does not match `\n`; `^`/`$` match only at the start/end of the whole text; `\d \w \s` (and negations) are ASCII classes; accepted escapes are escaped metacharacters and `\n \t \r \f \v`; the empty pattern is valid and matches every string. Anything not listed in E-0021 or here (including `\b`, POSIX `[[:alpha:]]` classes, nested quantifiers such as `a**`) is `KF-E-315`. A pattern whose compiled program exceeds 100000 instructions is `KF-E-315`.
+- (D-06) Enumeration order for overlap witnesses and uncovered tuples: inputs in `inputs[]` order with the **last input varying fastest** (lexicographic, first input outermost), each input's values in `domain` order.
+- (D-07) In `then`, any mapping at any depth whose key set is exactly `{value, unit}` is a quantity; its `unit` must be declared (`UNKNOWN_UNIT`) and its `value` must be a valid decimal string (`INVALID_DECIMAL`).
+
+**Rationale.** D-08 follows the accepted persistent format (an explicit schema alternative distinct from `default`) and the plain logic of an empty conjunction; the others choose the fail-loud or more literal option.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 planning)
+**Ratified**: pending
+**Affects.** P011, P012, P014.

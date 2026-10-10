@@ -34,3 +34,8 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 
 - kf-conformance-engineer (sonnet) raised 2 DECISION_NEEDED on P002 resolveId/id_alias; decided as E-0016 (LOW). Engineer re-briefed (same instance) to tighten F-R4/F-E4.
 - kf-spec-triage (sonnet) on P011: 12 items. T-01..T-11 decided as E-0017..E-0021; T-12 record-only (KF-E-313 belongs to P012). P011 opened as secondary on Track B (disjoint paths; implementer will run in a worktree).
+
+## 2026-10-10 P002 conformance slice; P002 implementer R01 started; P011 plan
+
+- P002: conformance slice committed 5fce77d (63 todo cases, written at 8d73627 before implementer code). kf-implementer R01 briefed (running).
+- P011: kf-phase-planner (sonnet) wrote PLAN (40 targets), TRIAGE, TRACEABILITY. Planner raised D-01..D-08; decided as E-0022, which amends E-0019: top-level `when: {}` is an unconditional non-default row (the accepted P001 schema and fixture use it). P011 PLANNED -> IMPLEMENTING as secondary; its implementer will run in a worktree.

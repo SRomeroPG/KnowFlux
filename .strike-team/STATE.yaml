@@ -100,10 +100,10 @@ phases:
     audit_round: 0
     accepted_audit: null
   P011:
-    status: PLANNED
+    status: IMPLEMENTING
     track: B
     depends_on: [P001]
-    plan: null
+    plan: .strike-team/phases/P011-decision-table-logic/PLAN.md
     last_product_commit: null
     audit_round: 0
     accepted_audit: null
@@ -246,12 +246,12 @@ phases:
 
 foreman:
   active_primary: P002
-  active_secondary: null
+  active_secondary: P011
   next_candidates: [P028, P011]
   last_run: 2026-10-10
   consecutive_failed_rounds: 0
 
-pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021]
+pending_ratification: [E-0001, E-0002, E-0003, E-0004, E-0005, E-0007, E-0008, E-0009, E-0010, E-0011, E-0012, E-0013, E-0014, E-0015, E-0016, E-0017, E-0018, E-0019, E-0020, E-0021, E-0022]
 open_decisions: [E-0006]
 open_spec_gaps: []
 
