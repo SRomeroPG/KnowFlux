@@ -141,3 +141,77 @@ accepted:
   - 'a?'
   - '\.'
   - ''
+
+# ---------------------------------------------------------------------------------------------------------------
+# P011 audit R01 remediation (AUDIT_R01.md). Expectations stated from the spec, errata and audit only.
+# ---------------------------------------------------------------------------------------------------------------
+
+# F-R1d (AUDIT F09; E-0022 D-05 "^/$ match only at the start/end of the whole text"; V-10): a text that is only a
+# newline, or ends in one, is not "empty": [pattern, text, search result]
+anchors_newline:
+  - ['^$', "\n", false]
+  - ['^$', "a\n", false]
+  - ['$', "\n", true]
+  - ['$', "a\n", true]
+  - ['^', "\n", true]
+  - ['^$', '', true]
+  - ['^\n$', "\n", true]
+
+# F-R1e (AUDIT F06; E-0022 D-05 "accepted escapes are escaped metacharacters and \n \t \r \f \v"): the escaped
+# metacharacters of the accepted syntax (\ ^ $ . | ? * + ( ) [ ] { }) and '-' compile and match the literal character.
+# [pattern, text containing it -> true, text without it -> false]
+escapes_accepted:
+  - ['\-', 'a-b', 'ab']
+  - ['\.', 'a.b', 'ab']
+  - ['\{', 'a{b', 'ab']
+  - ['\}', 'a}b', 'ab']
+  - ['\\', 'a\b', 'ab']
+  - ['\^', 'a^b', 'ab']
+  - ['\$', 'a$b', 'ab']
+  - ['\|', 'a|b', 'ab']
+  - ['\?', 'a?b', 'ab']
+  - ['\*', 'a*b', 'ab']
+  - ['\+', 'a+b', 'ab']
+  - ['\(', 'a(b', 'ab']
+  - ['\)', 'a)b', 'ab']
+  - ['\[', 'a[b', 'ab']
+  - ['\]', 'a]b', 'ab']
+
+# F-R2d (AUDIT F06; E-0022 D-05 "Anything not listed in E-0021 or here ... is KF-E-315"): an escape of any other
+# punctuation is not listed, hence KF-E-315 (the first six are named by the audit; the rest are the same rule).
+escapes_rejected:
+  - '\<'
+  - '\='
+  - '\ '
+  - '\/'
+  - '\_'
+  - '\,'
+  - '\>'
+  - '\!'
+  - '\"'
+  - '\#'
+  - '\%'
+  - '\&'
+  - '\'''
+  - '\:'
+  - '\;'
+  - '\@'
+  - '\~'
+  - 'a\<b'
+  - '(\=)'
+
+# F-R2e (AUDIT F10; E-0026 (2) "a program of exactly 100000 instructions compiles; 100001 is KF-E-315"; V-10).
+# Counting basis: AUDIT F02 reports `(?:[class]{1000}){99}` as a program of 99001 instructions, i.e. one instruction
+# per atom copy, none for a non-capturing group, one for the final match. On that basis:
+#   (?:a{1000}){99}a{999}  = 99000 + 999 + final match = 100000  -> compiles
+#   (?:a{1000}){99}a{1000} = 99000 + 1000 + final match = 100001 -> KF-E-315
+# The over-cap side is independent of the basis: any program has at least one instruction per atom copy plus the
+# final match, so 100000 atom copies is already 100001 instructions.
+cap_accept:
+  - '(?:a{1000}){99}a{999}'
+  - '(?:a{1000}){99}a{998}'
+  - '(?:a{1000}){99}'
+cap_reject:
+  - '(?:a{1000}){99}a{1000}'
+  - '(?:a{1000}){100}'
+  - '(?:a{1000}){101}'

@@ -233,3 +233,19 @@ export const FAIL_CLOSED_PAIRS = [
   [{ count: { lt: '5' } }, { note: 'a' }],
   [{ note: { matches: '^a' }, count: '1' }, { count: '2' }],
 ];
+
+// ---------------------------------------------------------------------------------------------
+// P011 audit R01 F07 (AUDIT_R01.md; spec l.633; E-0020 (b); PLAN V-32): a value set (eq / in) against a closed or
+// open bound. Same inputs as above (none is an enum). Every pair is checked in both orders.
+// ---------------------------------------------------------------------------------------------
+export const VALUESET_BOUND_OVERLAPPING = [
+  [{ count: '5' }, { count: { gte: '5' } }],                      // 5 satisfies both: the closed bound includes it
+  [{ count: '5' }, { count: { lte: '5' } }],
+  [{ count: { in: ['1', '5'] } }, { count: { between: ['5', '9'] } }], // between is inclusive (l.625)
+  [{ count: { in: ['1', '2'] } }, { count: { gte: '2.0' } }],     // 2 = 2.0 by value (E-0017)
+];
+
+export const VALUESET_BOUND_DISJOINT = [
+  [{ count: { in: ['1', '5'] } }, { count: { gt: '5' } }],        // the open bound excludes 5
+  [{ count: { in: ['1', '5'] } }, { count: { lt: '1' } }],        // the open bound excludes 1
+];

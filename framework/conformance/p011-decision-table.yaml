@@ -5,6 +5,8 @@
 #   .strike-team/phases/P011-decision-table-logic/PLAN.md (incl. "Foreman decisions after planning"), TRIAGE.md,
 #   knowledge-framework-spec-v2.1.md (l.420-460, 576-635, 1600, 1734-1800, 1953-1956, 2075-2103),
 #   knowledge-framework-spec-v2.1-errata.md (E-0008, E-0014, E-0017..E-0022).
+# Round R01 remediation cases (AUDIT_R01.md F01-F11, E-0025, E-0026) were added by a fresh conformance engineer at
+# commit 5e626fe before the remediation diff was read; see the "Round R01" block at the end of case_index.
 # Runner: test/conformance-p011-decision-table.test.mjs (engine API phase; there is no kf binary and no
 # framework/conformance/expected/ runner yet - P028 ports this slice). Vectors and builders:
 # framework/conformance/p011-decision-table/.
@@ -15,6 +17,7 @@
 schema_version: 2.1
 phase: P011
 status: enforced
+remediation_rounds: [R01]
 
 # Every key of case_index has at least one test whose title starts with the key, and every test key is indexed
 # (checked by the runner, test "F-M"). cites = spec line / errata entry / PLAN target the expectation comes from.
@@ -144,7 +147,7 @@ case_index:
   F-V1: {targets: [V-31], cites: ["spec l.633", "E-0020"], expect: "enumeration overlap: witness, first two rows, pointer"}
   F-V2: {targets: [V-31, V-34], cites: ["E-0020"], expect: "enumeration near-miss clean"}
   F-V3: {targets: [V-31], cites: ["E-0020"], expect: "enumeration exact for ne"}
-  F-V4: {targets: [V-31], cites: ["E-0020"], expect: "limit boundary; fail closed beyond it"}
+  F-V4: {targets: [V-31], cites: ["E-0020", "E-0025 (1)", "AUDIT_R01 F03"], expect: "RESTATED R01: enumeration needs product of sizes <= limit AND product of (size + 1) <= limit; domain [X,Y]: proofLimit 3 enumerates (clean), proofLimit 2 and 1 fall back and fail closed (not_proven_disjoint)"}
   F-V5: {targets: [V-31], cites: ["E-0020"], expect: "default alone never overlaps"}
   F-V6: {targets: [V-32, V-34], cites: ["E-0020"], expect: "eleven provably disjoint pairs, both orders"}
   F-V6b: {targets: [V-32, V-34], cites: ["E-0020"], expect: "seven overlapping pairs: one KF-E-312 not_proven_disjoint"}
@@ -167,3 +170,27 @@ case_index:
   F-A5: {targets: [V-40], cites: ["PLAN F-A5"], expect: "no change to acme-formulation, spec-examples, expected/, bin/, package.json, eslint config"}
   F-P1: {targets: [V-06], cites: ["PLAN F-P1"], expect: "modules import only engine siblings"}
   F-P2: {targets: [V-06, V-13], cites: ["spec l.582", "spec l.612", "PLAN F-P2"], expect: "banned identifiers absent"}
+
+  # ---- Round R01 remediation (P011 audit AUDIT_R01.md F01-F11; E-0025, E-0026). Enforced immediately; expected to be
+  # red against dad4d5a wherever the audit says behavior is wrong. Written from spec + errata + audit only.
+  F-R1d: {targets: [V-10], cites: ["E-0022 D-05", "AUDIT_R01 F09"], expect: "whole-text anchors: ^$ on a lone newline false, ^$ on a-newline false, $ on a lone newline true"}
+  F-R1e: {targets: [V-10], cites: ["E-0022 D-05", "AUDIT_R01 F06"], expect: "escaped metacharacters (backslash ^ $ . | ? * + ( ) [ ] { }) and hyphen compile and match the literal"}
+  F-R2d: {targets: [V-11, V-34], cites: ["E-0022 D-05", "AUDIT_R01 F06", "spec l.1770"], expect: "escapes of any other punctuation (less-than, equals, space, slash, underscore, comma, ...) are KF-E-315; metacharacter escapes and class escapes are clean"}
+  F-R2e: {targets: [V-10, V-11], cites: ["E-0026 (2)", "E-0022 D-05", "AUDIT_R01 F10"], expect: "program of exactly 100000 instructions compiles, 100001 is KF-E-315 (count basis: one instruction per atom copy + final match; see report DECISION_NEEDED)"}
+  F-R3d: {targets: [V-12], cites: ["spec l.612", "PLAN V-12", "AUDIT_R01 F01", "AUDIT_R01 F02"], expect: "nested zero-width counted repeats and a 1200-code-point class under {1000}){99} answer (ok or not ok) within 5 s through compileRe2, run in a child process with a hard timeout"}
+  F-R3e: {targets: [V-12], cites: ["spec l.612", "PLAN V-12", "AUDIT_R01 F01", "AUDIT_R01 F02"], expect: "same patterns in a matches matcher: check and evaluate within 5 s; codes [] or exactly [KF-E-315]; evaluation consistent"}
+  F-O27: {targets: [V-14], cites: ["E-0019", "AUDIT_R01 F11"], expect: "string and enum equality is code-point equality: U+00E9 differs from e + U+0301 under eq, ne, in, not_in, literal and enum domain"}
+  F-B6: {targets: [V-16], cites: ["E-0019", "AUDIT_R01 F05"], expect: "inputs x and A.x: when key x is AMBIGUOUS_FIELD, key A.x binds; near-miss x with B.y binds"}
+  F-B6b: {targets: [V-16], cites: ["E-0022 D-02", "E-0019", "AUDIT_R01 F05"], expect: "supplied key x is AMBIGUOUS_FIELD with inputs x and A.x; A.x binds"}
+  F-L8: {targets: [V-18], cites: ["spec l.607", "E-0026 (1)", "AUDIT_R01 F11"], expect: "ne: null false; in with a null element true only for a non-null match; not_in with a null element false; not_in without null true"}
+  F-Q12: {targets: [V-20], cites: ["E-0019", "E-0025 (3)", "AUDIT_R01 F04"], expect: "quantity literal on enum/string/boolean input: exactly one static KF-E-310, expected_unit null, found_unit the literal unit, element pointers"}
+  F-Q13: {targets: [V-21], cites: ["E-0019", "E-0025 (3)", "AUDIT_R01 F04"], expect: "supplied string/boolean/enum value for a quantity input: status error, KF-E-310 found_unit null; matching unit, null and absent are accepted"}
+  F-Q14: {targets: [V-21], cites: ["E-0019", "E-0025 (3)"], expect: "supplied quantity for enum/string/boolean input: KF-E-310 expected_unit null (either direction of E-0025 (3))"}
+  F-X13: {targets: [V-29], cites: ["spec l.634", "E-0025 (2)", "AUDIT_R01 F03"], expect: "exhaustive enum table without default: absent input is status ok, result null (collect: [])"}
+  F-V4b: {targets: [V-31], cites: ["E-0025 (1)", "AUDIT_R01 F03"], expect: "two-product condition at limit 256: 255 values enumerate, 256 fall back; 15x15 enumerate, 15x16 fall back"}
+  F-V6d: {targets: [V-32], cites: ["spec l.625", "spec l.633", "E-0017", "E-0020", "AUDIT_R01 F07"], expect: "eq vs gte/lte at the shared value, in vs between inclusive, in [1,2] vs gte 2.0: KF-E-312 not_proven_disjoint, both orders"}
+  F-V6e: {targets: [V-32], cites: ["spec l.633", "E-0020", "AUDIT_R01 F07"], expect: "in [1,5] vs gt 5 and vs lt 1: provably disjoint, both orders"}
+  F-V10: {targets: [V-31], cites: ["spec l.607", "spec l.633", "E-0025 (1)", "AUDIT_R01 F03"], expect: "not X vs is_null: KF-E-312 proof enumeration with a witness containing null (null last, D-06 order); agrees with evaluation"}
+  F-V10b: {targets: [V-31, V-33], cites: ["spec l.607", "E-0025 (1)", "AUDIT_R01 F03"], expect: "near-misses clean (eq, ne, not vs X, not-null vs null); beyond the limit the proof falls back and fails closed"}
+  F-S6: {targets: [V-35], cites: ["PLAN sort key", "AUDIT_R01 F08"], expect: "evaluation diagnostics sorted by code: [KF-E-310, KF-E-314] though the enum input comes first"}
+  F-S7: {targets: [V-35], cites: ["PLAN sort key", "AUDIT_R01 F08"], expect: "same-code evaluation diagnostics ordered by pointer in byte order: /inputs/10 before /inputs/2"}

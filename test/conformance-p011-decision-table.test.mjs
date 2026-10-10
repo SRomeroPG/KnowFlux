@@ -12,6 +12,12 @@
 // Every engine case is marked todo while the engine is being built: it runs and reports but does not fail
 // `npm test`. Removing the marker is the one-line change below (PENDING = false). Expectations are never
 // weakened to pass; a missing engine module makes the case fail INSIDE its todo.
+//
+// Round R01 remediation (P011 audit AUDIT_R01.md, findings F01-F11; errata E-0025, E-0026): cases added by a fresh
+// conformance engineer from the spec, the errata and the audit file only, BEFORE the remediation diff was read. They
+// are enforced immediately (no todo marker). F-V4 was restated under E-0025 (1); every other earlier expectation is
+// unchanged. New keys: F-R1d F-R1e F-R2d F-R2e F-R3d F-R3e F-O27 F-B6 F-B6b F-L8 F-Q12 F-Q13 F-Q14 F-X13 F-V4b
+// F-V6d F-V6e F-V10 F-V10b F-S6 F-S7.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
@@ -21,8 +27,10 @@ import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import YAML from 'yaml';
 import { payload } from '../framework/conformance/p011-decision-table/determinism-child.mjs';
+import { BOUND_PATTERNS, RE2_BOUND_MS } from '../framework/conformance/p011-decision-table/regex-bound-patterns.mjs';
 import {
   DISJOINT_PAIRS, FAIL_CLOSED_PAIRS, NULL_WHENS, OPERATOR_CASES, OVERLAPPING_PAIRS, Q, REFS, S1, TH,
+  VALUESET_BOUND_DISJOINT, VALUESET_BOUND_OVERLAPPING,
   allFiveCodes, input, inputs, multiKeyFindings, pair, permute, table, vals,
 } from '../framework/conformance/p011-decision-table/tables.mjs';
 
@@ -472,6 +480,89 @@ check('F-R3c', 'nested counted repeats beyond the 100000-instruction cap are rej
   assert.ok(ms < 5000);
 });
 
+// ------------------------------------------------------------------ R01 remediation: RE2 (AUDIT_R01 F01, F02, F06, F09, F10)
+check('F-R1d', '^ and $ are whole-text anchors even on a text that is only a newline (E-0022 D-05; AUDIT F09; V-10)', () => {
+  const R = mod('re2');
+  for (const [pattern, text, expected] of REGEX.anchors_newline) {
+    const compiled = R.compileRe2(pattern);
+    assert.equal(compiled.ok, true, `compile ${JSON.stringify(pattern)}`);
+    assert.equal(R.searchRe2(compiled.program, text), expected, `search ${JSON.stringify(pattern)} in ${JSON.stringify(text)}`);
+  }
+});
+
+check('F-R1e', 'escaped metacharacters \\ ^ $ . | ? * + ( ) [ ] { } and - compile and match the literal (E-0022 D-05; AUDIT F06)', () => {
+  const R = mod('re2');
+  for (const [pattern, withChar, without] of REGEX.escapes_accepted) {
+    const compiled = R.compileRe2(pattern);
+    assert.equal(compiled.ok, true, `compile ${JSON.stringify(pattern)}`);
+    assert.equal(R.searchRe2(compiled.program, withChar), true, `${JSON.stringify(pattern)} in ${JSON.stringify(withChar)}`);
+    assert.equal(R.searchRe2(compiled.program, without), false, `${JSON.stringify(pattern)} in ${JSON.stringify(without)}`);
+  }
+  for (const [pattern, text, expected] of [['\\n', 'a\nb', true], ['\\t', 'a\tb', true], ['\\\\', 'a\\b', true]]) {
+    const compiled = R.compileRe2(pattern);
+    assert.equal(compiled.ok, true, `compile ${JSON.stringify(pattern)}`);
+    assert.equal(R.searchRe2(compiled.program, text), expected);
+  }
+});
+
+check('F-R2d', 'an escape that is not a metacharacter, "-" or \\n \\t \\r \\f \\v \\d \\w \\s is KF-E-315 (E-0022 D-05; AUDIT F06)', () => {
+  const R = mod('re2');
+  const t = (pattern) => S1(['s'], { note: { matches: pattern } });
+  for (const pattern of REGEX.escapes_rejected) {
+    assert.equal(R.compileRe2(pattern).ok, false, `compile ${JSON.stringify(pattern)} must be rejected`);
+    expectDiags(ck(t(pattern)), [{ code: 'KF-E-315', pointer: '/rules/0/when/note/matches', rule: 'r1', rule_index: 0, pattern }], JSON.stringify(pattern));
+  }
+  for (const [pattern] of REGEX.escapes_accepted) assert.deepEqual(ck(t(pattern)), [], `near-miss ${JSON.stringify(pattern)}`);
+  for (const pattern of ['\\d\\w\\s\\D\\W\\S', '\\n\\t\\r\\f\\v']) assert.deepEqual(ck(t(pattern)), [], `near-miss ${JSON.stringify(pattern)}`);
+});
+
+check('F-R2e', 'program-size cap boundary: exactly 100000 instructions compiles, 100001 is KF-E-315, final match counted (E-0026 (2); AUDIT F10)', () => {
+  const R = mod('re2');
+  const t = (pattern) => S1(['s'], { note: { matches: pattern } });
+  for (const pattern of REGEX.cap_accept) {
+    assert.equal(timedCompile(R, pattern).ok, true, `${pattern} must compile`);
+    assert.deepEqual(ck(t(pattern)), [], `${pattern} as a matches pattern is clean`);
+  }
+  for (const pattern of REGEX.cap_reject) {
+    assert.equal(timedCompile(R, pattern).ok, false, `${pattern} must be rejected`);
+    expectDiags(ck(t(pattern)), [{ code: 'KF-E-315', pointer: '/rules/0/when/note/matches', rule: 'r1', pattern }], pattern);
+  }
+}, 120000);
+
+/** Run a regression pattern in a child process under a hard timeout: a hang fails here instead of hanging the suite. */
+function runBoundChild(name, via) {
+  const child = spawnSync(process.execPath, [path.join(DATA, 'regex-bound-child.mjs'), name, via], {
+    encoding: 'utf8', timeout: 20000, maxBuffer: 1 << 20,
+  });
+  assert.equal(child.error, undefined, `${name}/${via}: child did not finish within the hard timeout (${child.error?.message})`);
+  assert.equal(child.status, 0, `${name}/${via}: child failed: ${child.stderr}`);
+  return JSON.parse(child.stdout);
+}
+
+check('F-R3d', 'zero-width and large-class counted repeats finish within the V-12 bound through compileRe2 (l.612; AUDIT F01, F02)', () => {
+  for (const name of Object.keys(BOUND_PATTERNS)) {
+    const out = runBoundChild(name, 'compile');
+    assert.equal(typeof out.ok, 'boolean', `${name}: answered ok or not ok`);
+    assert.ok(out.compile_ms < RE2_BOUND_MS, `${name}: compileRe2 took ${Math.round(out.compile_ms)} ms (bound ${RE2_BOUND_MS})`);
+    if (out.ok) assert.ok(out.search_ms < RE2_BOUND_MS, `${name}: searchRe2 took ${Math.round(out.search_ms)} ms`);
+  }
+}, 180000);
+
+check('F-R3e', 'the same patterns inside a matches matcher: check and evaluate answer within the V-12 bound, ok or KF-E-315 (l.612; AUDIT F01, F02)', () => {
+  for (const name of Object.keys(BOUND_PATTERNS)) {
+    const out = runBoundChild(name, 'check');
+    assert.ok(out.codes.length === 0 || (out.codes.length === 1 && out.codes[0] === 'KF-E-315'), `${name}: codes ${JSON.stringify(out.codes)}`);
+    assert.ok(out.check_ms < RE2_BOUND_MS, `${name}: checkDecisionTable took ${Math.round(out.check_ms)} ms (bound ${RE2_BOUND_MS})`);
+    assert.ok(out.eval_ms < RE2_BOUND_MS, `${name}: evaluateDecisionTable took ${Math.round(out.eval_ms)} ms (bound ${RE2_BOUND_MS})`);
+    if (out.codes.length === 0) {
+      assert.equal(out.eval_status, 'ok', `${name}: a clean table evaluates`);
+    } else {
+      assert.equal(out.eval_status, 'error', `${name}: KF-E-315 blocks evaluation (P-03)`);
+      assert.deepEqual(out.eval_codes, ['KF-E-315']);
+    }
+  }
+}, 180000);
+
 // ============================================================================================ operators (F-O)
 for (const c of OPERATOR_CASES) {
   check(c.key, `${c.title} (l.621-627; V-14/V-15)`, () => {
@@ -484,6 +575,32 @@ for (const c of OPERATOR_CASES) {
 check('F-O18', 'between with min > max is INVALID_RANGE from check and evaluate (E-0019)', () => {
   bothThrow(S1(['d'], { count: { between: ['5', '1'] } }), 'INVALID_RANGE');
   assert.deepEqual(ck(S1(['d'], { count: { between: ['1', '5'] } })), [], 'near-miss');
+});
+
+check('F-O27', 'strings and enum values compare by code point, no Unicode normalization (E-0019; AUDIT F11; V-14)', () => {
+  const composed = 'é'; // U+00E9
+  const decomposed = 'é'; // U+0065 U+0301
+  const lit = (W, supplied, expected) => {
+    const t = S1(['s'], W);
+    assert.deepEqual(ck(t), []);
+    expectRow(ev(t, vals({ note: supplied })), t, expected);
+  };
+  lit({ note: composed }, decomposed, 'r2');
+  lit({ note: composed }, composed, 'r1');
+  lit({ note: decomposed }, composed, 'r2');
+  lit({ note: decomposed }, decomposed, 'r1');
+  lit({ note: { eq: composed } }, decomposed, 'r2');
+  lit({ note: { ne: composed } }, decomposed, 'r1');
+  lit({ note: { ne: composed } }, composed, 'r2');
+  lit({ note: { in: [composed] } }, decomposed, 'r2');
+  lit({ note: { not_in: [composed] } }, decomposed, 'r1');
+  lit({ note: 'abc' }, 'ABC', 'r2');
+  const enumIn = { ref: REFS.material, type: 'enum', domain: [composed, 'X'] };
+  const te = S1([enumIn], { material: composed });
+  assert.deepEqual(ck(te), []);
+  expectRow(ev(te, vals({ material: composed })), te, 'r1');
+  expectError(ev(te, vals({ material: decomposed })), [{ code: 'KF-E-314', input: REFS.material, value: decomposed, source: 'value', pointer: '/inputs/0' }]);
+  expectDiags(ck(S1([enumIn], { material: decomposed })), [{ code: 'KF-E-314', value: decomposed, source: 'literal', pointer: '/rules/0/when/material' }]);
 });
 
 // ============================================================================================ binding (F-B)
@@ -548,6 +665,37 @@ check('F-B3b4', 'hostile supplied keys are plain unbound keys (E-0022 D-02; no p
   assert.equal(Object.getPrototypeOf({}), Object.prototype);
 });
 
+// AUDIT F05: inputs `x` and `A.x` share the suffix `x`. Foreman reading of E-0019 ("a suffix shared by two inputs
+// ... is a typed error"): the key `x` is AMBIGUOUS_FIELD although it equals the full ref of the first input; the key
+// `A.x` binds by full ref. The same rule binds supplied values (E-0022 D-02).
+const SHARED_SUFFIX = () => [{ ref: 'x', type: 'decimal' }, { ref: 'A.x', type: 'decimal' }];
+
+check('F-B6', 'a when key equal to one input ref and a suffix of another is AMBIGUOUS_FIELD; the full ref binds (E-0019; AUDIT F05; V-16)', () => {
+  bothThrow(S1(SHARED_SUFFIX(), { x: '1' }), 'AMBIGUOUS_FIELD');
+  bothThrow(S1(SHARED_SUFFIX(), { not: { x: '1' } }), 'AMBIGUOUS_FIELD');
+  bothThrow(S1(SHARED_SUFFIX(), { any: [{ 'A.x': '1' }, { x: '1' }] }), 'AMBIGUOUS_FIELD');
+  const t = S1(SHARED_SUFFIX(), { 'A.x': '1' });
+  assert.deepEqual(ck(t), []);
+  expectRow(ev(t, { 'A.x': '1' }), t, 'r1');
+  expectRow(ev(t, { 'A.x': '2' }), t, 'r2');
+  expectRow(ev(t, {}), t, 'r2');
+  // near-miss: the key is the full ref of one input and the suffix of no other
+  const other = S1([{ ref: 'x', type: 'decimal' }, { ref: 'B.y', type: 'decimal' }], { x: '1' });
+  assert.deepEqual(ck(other), []);
+  expectRow(ev(other, { x: '1' }), other, 'r1');
+  expectRow(ev(other, { x: '2' }), other, 'r2');
+});
+
+check('F-B6b', 'a supplied key that is one input ref and the suffix of another is AMBIGUOUS_FIELD; the full ref binds (E-0022 D-02; AUDIT F05; V-16)', () => {
+  const DT = mod('dt');
+  const t = S1(SHARED_SUFFIX(), { 'A.x': '1' });
+  expectLogicError(() => DT.evaluateDecisionTable(clone(t), { x: '1' }, { unitRegistry: reg('u1') }), 'AMBIGUOUS_FIELD');
+  expectLogicError(() => DT.evaluateDecisionTable(clone(t), { 'A.x': '1', x: '1' }, { unitRegistry: reg('u1') }), 'AMBIGUOUS_FIELD');
+  expectRow(ev(t, { 'A.x': '1' }), t, 'r1');
+  const other = S1([{ ref: 'x', type: 'decimal' }, { ref: 'B.y', type: 'decimal' }], { x: '1' });
+  expectRow(ev(other, { y: '5', x: '1' }), other, 'r1');
+});
+
 // ============================================================================================ null / absent (F-L)
 const L_INS = ['e', 'd', 's'];
 check('F-L1', 'every matcher is false on an absent input (l.607; E-0019)', () => {
@@ -609,6 +757,32 @@ check('F-L7', 'null is neither zero nor false (l.606)', () => {
   const tl = S1(['d'], { count: { lte: '0' } });
   expectRow(ev(tl, {}), tl, 'r2');
   expectRow(ev(tl, vals({ count: '0' })), tl, 'r1');
+});
+
+check('F-L8', 'literal null operands in ne, in, not_in (spec l.607; E-0026 (1); AUDIT F11; V-18)', () => {
+  // [input shorthand, when, [supplied value or undefined for absent, expected row]]
+  const rows = [
+    ['s', { note: { ne: null } }, [['x', 'r2'], [undefined, 'r2'], [null, 'r2']]],
+    ['s', { not: { note: { ne: null } } }, [['x', 'r1']]],
+    ['s', { note: { in: ['x', null] } }, [['x', 'r1'], ['y', 'r2'], [undefined, 'r2']]],
+    ['s', { note: { in: [null] } }, [['x', 'r2'], [undefined, 'r2']]],
+    ['s', { note: { not_in: ['y', null] } }, [['x', 'r2'], ['y', 'r2'], [undefined, 'r2']]],
+    ['s', { note: { not_in: [null] } }, [['x', 'r2'], [undefined, 'r2']]],
+    ['s', { note: { not_in: ['y'] } }, [['x', 'r1'], ['y', 'r2'], [undefined, 'r2']]],
+    ['d', { count: { in: ['1', null] } }, [['1.0', 'r1'], ['2', 'r2'], [undefined, 'r2']]],
+    ['d', { count: { not_in: ['2', null] } }, [['1', 'r2'], [undefined, 'r2']]],
+    ['e', { material: { ne: null } }, [['X', 'r2'], [undefined, 'r2']]],
+    ['e', { material: { in: ['X', null] } }, [['X', 'r1'], ['Y', 'r2'], [undefined, 'r2']]],
+    ['e', { material: { not_in: ['Y', null] } }, [['X', 'r2'], [undefined, 'r2']]],
+  ];
+  for (const [shorthand, W, cases] of rows) {
+    const t = S1([shorthand], W);
+    assert.deepEqual(ck(t), [], `the table checks clean: ${JSON.stringify(W)}`);
+    const name = Object.keys(W)[0] === 'not' ? Object.keys(W.not)[0] : Object.keys(W)[0];
+    for (const [supplied, expected] of cases) {
+      expectRow(ev(t, vals({ [name]: supplied })), t, expected);
+    }
+  }
 });
 
 // ============================================================================================ enum domains (F-D)
@@ -740,6 +914,62 @@ check('F-Q11d', 'near-miss: a mapping whose key set is not exactly {value, unit}
   const t = table({ ins: inputs('e'), rows: [['r1', { material: 'X' }, then], ['r2', 'default']] });
   assert.deepEqual(ck(t), []);
   expectRow(ev(t, vals({ material: 'X' })), t, 'r1');
+});
+
+// E-0025 (3): "bare scalar" is any non-quantity value (decimal, string, boolean, enum value); a quantity against it,
+// in either direction, is KF-E-310 statically and at evaluation, with `null` as the unit of the non-quantity side.
+check('F-Q12', 'a quantity literal on an enum, string or boolean input is a static KF-E-310 with expected_unit null (E-0025 (3); AUDIT F04; V-20)', () => {
+  const q310n = (ref, pointer) => ({
+    code: 'KF-E-310', pointer, input: ref, expected_unit: null, found_unit: 'percent_mass', source: 'literal', rule: 'r1', rule_index: 0,
+  });
+  const cases = [
+    ['e', { material: Q('1', 'pm') }, REFS.material, '/rules/0/when/material'],
+    ['e', { material: { eq: Q('1', 'pm') } }, REFS.material, '/rules/0/when/material/eq'],
+    ['e', { material: { in: ['X', Q('1', 'pm')] } }, REFS.material, '/rules/0/when/material/in/1'],
+    ['s', { note: Q('1', 'pm') }, REFS.note, '/rules/0/when/note'],
+    ['s', { note: { ne: Q('1', 'pm') } }, REFS.note, '/rules/0/when/note/ne'],
+    ['s', { note: { not_in: ['a', Q('1', 'pm')] } }, REFS.note, '/rules/0/when/note/not_in/1'],
+    ['b', { flag: Q('1', 'pm') }, REFS.flag, '/rules/0/when/flag'],
+    ['b', { flag: { eq: Q('1', 'pm') } }, REFS.flag, '/rules/0/when/flag/eq'],
+  ];
+  for (const [shorthand, W, ref, pointer] of cases) {
+    expectDiags(ck(S1([shorthand], W)), [q310n(ref, pointer)], JSON.stringify(W));
+  }
+  // near-misses: the same shapes with a quantity input in the declared unit, and bare scalars on the scalar inputs
+  assert.deepEqual(ck(S1(['q'], { concentration: Q('1', 'pm') })), []);
+  assert.deepEqual(ck(S1(['q'], { concentration: { in: [Q('1', 'pm'), Q('2', 'pm')] } })), []);
+  assert.deepEqual(ck(S1(['e'], { material: { in: ['X', 'Y'] } })), []);
+  assert.deepEqual(ck(S1(['s'], { note: 'a' })), []);
+  assert.deepEqual(ck(S1(['b'], { flag: true })), []);
+});
+
+check('F-Q13', 'a supplied string, boolean or enum value for a quantity input is KF-E-310 with found_unit null (E-0025 (3); AUDIT F04; V-21)', () => {
+  const t = S1(QIN, { concentration: { lte: Q('4.2', 'pm') } });
+  for (const supplied of ['abc', 'X', 'true', true, false, '4.2']) {
+    expectError(ev(t, vals({ concentration: supplied })), [{
+      code: 'KF-E-310', source: 'value', input: REFS.concentration, expected_unit: 'percent_mass', found_unit: null, pointer: '/inputs/0', rule: null, rule_index: null,
+    }]);
+  }
+  // near-misses: the declared unit evaluates; null and absent are always accepted (PLAN P-04)
+  expectRow(ev(t, vals({ concentration: Q('4.2', 'pm') })), t, 'r1');
+  expectRow(ev(t, vals({ concentration: null })), t, 'r2');
+  expectRow(ev(t, {}), t, 'r2');
+});
+
+check('F-Q14', 'a supplied quantity for an enum, string or boolean input is KF-E-310 with expected_unit null (E-0025 (3); AUDIT F04; V-21)', () => {
+  const cases = [
+    ['e', { material: 'X' }, 'material', 'X'],
+    ['s', { note: 'a' }, 'note', 'a'],
+    ['b', { flag: true }, 'flag', true],
+  ];
+  for (const [shorthand, W, name, good] of cases) {
+    const t = S1([shorthand], W);
+    expectError(ev(t, vals({ [name]: Q('1', 'pm') })), [{
+      code: 'KF-E-310', source: 'value', input: REFS[name], expected_unit: null, found_unit: 'percent_mass', pointer: '/inputs/0', rule: null, rule_index: null,
+    }], name);
+    expectRow(ev(t, vals({ [name]: good })), t, 'r1');
+    expectRow(ev(t, {}), t, 'r2');
+  }
 });
 
 // ============================================================================================ typed errors (F-Y)
@@ -1048,6 +1278,21 @@ check('F-X12', 'a top-level when: {} does not satisfy the default requirement bu
   expectDiags(ck(exhaustive(inputs('q'), [['r1', {}]])), [X311({ reason: 'non_enum_input', input: REFS.concentration })]);
 });
 
+check('F-X13', 'coverage is proven over domains only: an exhaustive enum table without default evaluates an absent input to no match (E-0025 (2); AUDIT F03)', () => {
+  const rows = [['r1', { material: { not_in: ['X'] } }], ['r2', { material: 'X' }]];
+  const t = exhaustive(inputs('e'), rows);
+  assert.deepEqual(ck(t), [], 'the domain product is covered');
+  const absent = ev(t, {});
+  expectRow(absent, t, null);
+  assert.equal(absent.status, 'ok');
+  assert.equal(absent.result, null);
+  expectRow(ev(t, vals({ material: null })), t, null);
+  expectRow(ev(t, vals({ material: 'Y' })), t, 'r1');
+  const collect = exhaustive(inputs('e'), rows, 'collect');
+  assert.deepEqual(ck(collect), []);
+  expectCollect(ev(collect, {}), collect, []);
+});
+
 // ============================================================================================ overlap for unique (F-V)
 const V312 = (extra) => ({ code: 'KF-E-312', pointer: '/rules/0', rule: 'r1', rule_index: 0, ...extra });
 
@@ -1065,11 +1310,31 @@ check('F-V3', 'enumeration is exact where set reasoning is not: ne (E-0020)', ()
   expectDiags(ck(pair([input('A')], { a: { ne: 'X' } }, { a: 'Y' })), [V312({ proof: 'enumeration', rules: ['r1', 'r2'], witness: { [REFS.a]: 'Y' } })]);
 });
 
-check('F-V4', 'limit boundary: product 2 is enumerated with proofLimit 2; with 1 the proof falls back and fails closed (E-0020)', () => {
+// RESTATED under E-0025 (1) (AUDIT F03). Before R01 this case asserted that domain [X, Y] is enumerated with
+// proofLimit 2. E-0025 (1): enumeration also ranges over `null` (absent) and applies only when the product of the
+// domain sizes is <= the limit AND the product of (size + 1) is <= the limit. Domain [X, Y]: 2 and 3.
+check('F-V4', 'limit boundary: enumeration needs the product of sizes and of (size + 1) within the limit; otherwise the proof falls back and fails closed (E-0020; E-0025 (1))', () => {
   const t = pair([input('A')], { a: { ne: 'X' } }, { a: 'X' });
-  assert.deepEqual(ck(t, { proofLimit: 2 }), []);
-  expectDiags(ck(t, { proofLimit: 1 }), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })]);
+  assert.deepEqual(ck(t, { proofLimit: 3 }), [], 'products 2 and 3 are within 3: enumerated, disjoint');
+  assert.deepEqual(ck(t), [], 'default limit 256');
+  const failClosed = [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })];
+  expectDiags(ck(t, { proofLimit: 2 }), failClosed, 'product 2 <= 2 but product of (size + 1) = 3 > 2 (E-0025 (1)): falls back, ne is not provable');
+  expectDiags(ck(t, { proofLimit: 1 }), failClosed);
   assert.deepEqual(ck(pair([input('A')], { a: 'X' }, { a: 'Y' }), { proofLimit: 1 }), [], 'near-miss: set reasoning proves disjointness without enumeration');
+  assert.deepEqual(ck(pair([input('A')], { a: 'X' }, { a: 'Y' }), { proofLimit: 2 }), [], 'near-miss at proofLimit 2');
+});
+
+check('F-V4b', 'the two-product condition at the default limit 256 (E-0025 (1); AUDIT F03)', () => {
+  const names = (p, n) => Array.from({ length: n }, (_, i) => `${p}${String(i).padStart(2, '0')}`);
+  const one = (n) => pair([{ ref: REFS.a, type: 'enum', domain: names('a', n) }], { a: { ne: 'a00' } }, { a: 'a00' });
+  assert.deepEqual(ck(one(255)), [], '255 values: 255 <= 256 and 256 <= 256: enumerated');
+  expectDiags(ck(one(256)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], '256 values: 256 <= 256 but 257 > 256: falls back');
+  const two = (n, m) => pair(
+    [{ ref: REFS.a, type: 'enum', domain: names('a', n) }, { ref: REFS.b, type: 'enum', domain: names('b', m) }],
+    { a: { ne: 'a00' } }, { a: 'a00' },
+  );
+  assert.deepEqual(ck(two(15, 15)), [], '15 x 15: 225 and 16 x 16 = 256: enumerated');
+  expectDiags(ck(two(15, 16)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], '15 x 16: 240 <= 256 but 16 x 17 = 272 > 256: falls back');
 });
 
 check('F-V5', 'a default row alone never overlaps (E-0020)', () => {
@@ -1120,6 +1385,55 @@ check('F-V9', 'a top-level when: {} overlaps every other non-default row (E-0022
   const t = table({ policy: 'unique', ins: inputs('e'), rows: [['r1', {}], ['r2', { material: 'X' }]] });
   expectError(ev(t, vals({ material: 'X' })), [{ code: 'KF-E-312', proof: 'evaluation', rules: ['r1', 'r2'] }]);
   expectRow(ev(t, vals({ material: 'Y' })), t, 'r1');
+});
+
+check('F-V6d', 'a value set against a closed bound overlaps at the shared value (l.625, l.633; E-0017; E-0020; AUDIT F07; V-32)', () => {
+  VALUESET_BOUND_OVERLAPPING.forEach(([w1, w2], i) => {
+    expectDiags(ck(pair(NON_ENUM, w1, w2)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], `pair ${i} ${JSON.stringify([w1, w2])}`);
+    expectDiags(ck(pair(NON_ENUM, w2, w1)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], `pair ${i} swapped`);
+  });
+});
+
+check('F-V6e', 'a value set against an open bound that excludes every member is provably disjoint (l.633; E-0020; AUDIT F07; V-32)', () => {
+  VALUESET_BOUND_DISJOINT.forEach(([w1, w2], i) => {
+    assert.deepEqual(ck(pair(NON_ENUM, w1, w2)), [], `pair ${i} ${JSON.stringify([w1, w2])}`);
+    assert.deepEqual(ck(pair(NON_ENUM, w2, w1)), [], `pair ${i} swapped`);
+  });
+});
+
+// E-0025 (1) (AUDIT F03): enumeration ranges over each input's domain values and then `null` (absent), null last.
+const A_AB = () => [input('A'), input('B')];
+check('F-V10', 'unique: rows that both match an absent input overlap by enumeration, with a witness containing null (l.607, l.633; E-0025 (1); AUDIT F03)', () => {
+  // the audit reproduction: enum domain [X, Y], r1 not X, r2 is_null
+  const t = pair([input('e', ['X', 'Y'])], { not: { material: 'X' } }, { material: { is_null: true } });
+  expectDiags(ck(t), [V312({ proof: 'enumeration', rules: ['r1', 'r2'], rule_indexes: [0, 1], witness: { [REFS.material]: null } })]);
+  // static finding and evaluation agree: the same table evaluated with the input absent
+  expectError(ev(t, {}), [{ code: 'KF-E-312', proof: 'evaluation', rules: ['r1', 'r2'], pointer: '/rules/0' }]);
+  expectRow(ev(t, vals({ material: 'Y' })), t, 'r1');
+  // D-06 order with null last, first input outermost: tuples (X,P) (X,Q) (X,null) (Y,P) (Y,Q) (Y,null) (null,P) ...
+  const w = (a, b) => ({ [REFS.a]: a, [REFS.b]: b });
+  expectDiags(ck(pair(A_AB(), { not: { a: 'X' } }, { all: [{ a: { is_null: true } }, { b: 'P' }] })),
+    [V312({ proof: 'enumeration', rules: ['r1', 'r2'], witness: w(null, 'P') })], 'first input: null after all domain values');
+  expectDiags(ck(pair(A_AB(), { not: { b: 'P' } }, { all: [{ a: 'X' }, { b: { is_null: true } }] })),
+    [V312({ proof: 'enumeration', rules: ['r1', 'r2'], witness: w('X', null) })], 'last input: null after its domain values');
+  expectDiags(ck(pair(A_AB(), { not: { a: 'X' } }, { b: { is_null: true } })),
+    [V312({ proof: 'enumeration', rules: ['r1', 'r2'], witness: w('Y', null) })], 'fastest-varying input exhausts its values and null before the next outer value');
+  const diags = ck(pair(A_AB(), { not: { a: 'X' } }, { b: { is_null: true } }));
+  assert.deepEqual(Object.keys(diags[0].witness), [REFS.a, REFS.b], 'witness keys follow inputs[] order');
+});
+
+check('F-V10b', 'unique with an absent input: near-misses that must stay clean, and the fallback beyond the limit (l.607; E-0025 (1); AUDIT F03)', () => {
+  const single = (w1, w2) => ck(pair([input('e', ['X', 'Y'])], w1, w2));
+  assert.deepEqual(single({ material: 'Y' }, { material: { is_null: true } }), [], 'eq never matches null');
+  assert.deepEqual(single({ material: { ne: 'X' } }, { material: { is_null: true } }), [], 'ne on null is false (l.607)');
+  assert.deepEqual(single({ not: { material: 'X' } }, { material: 'X' }), [], 'not X and X are disjoint, null included');
+  assert.deepEqual(single({ not: { material: { is_null: true } } }, { material: { is_null: true } }), [], 'not-null versus null');
+  assert.deepEqual(single({ material: { is_null: false } }, { material: { is_null: true } }), [], 'is_null false versus true');
+  // beyond the limit the interval/set reasoning applies and fails closed for rows that contain not / is_null
+  const names = (n) => Array.from({ length: n }, (_, i) => `v${String(i).padStart(3, '0')}`);
+  const big = (n) => pair([{ ref: REFS.a, type: 'enum', domain: names(n) }], { not: { a: 'v000' } }, { a: { is_null: true } });
+  expectDiags(ck(big(255)), [V312({ proof: 'enumeration', rules: ['r1', 'r2'], witness: { [REFS.a]: null } })], '255 values: 256 <= 256: enumerated, null is the witness');
+  expectDiags(ck(big(256)), [V312({ proof: 'not_proven_disjoint', rules: ['r1', 'r2'], rule_indexes: [0, 1] })], '256 values: 257 > 256: fail closed');
 });
 
 // ============================================================================================ code matrix (F-K) and diagnostics (F-S)
@@ -1233,6 +1547,29 @@ check('F-S5b', 'sortDiagnostics orders by (code, rule_index, pointer, rule_index
   assert.deepEqual(out, expected);
   assert.notStrictEqual(out, shuffled, 'returns a new array');
   assert.deepEqual(shuffled, snapshot, 'does not reorder its argument');
+});
+
+// AUDIT F08 (PLAN "Diagnostic sort key ... applied to every returned list, including evaluation diagnostics"; V-35)
+check('F-S6', 'evaluation diagnostics are sorted by code, not by input order (PLAN sort key; AUDIT F08; V-35)', () => {
+  const t = S1([input('e', ['X']), input('q')], { material: 'X' });
+  const res = ev(t, vals({ material: 'W', concentration: Q('1', 'ppm') }));
+  expectError(res, [
+    { code: 'KF-E-310', pointer: '/inputs/1', input: REFS.concentration, source: 'value' },
+    { code: 'KF-E-314', pointer: '/inputs/0', input: REFS.material, source: 'value' },
+  ]);
+  assert.deepEqual(res.diagnostics.map((d) => d.code), ['KF-E-310', 'KF-E-314']);
+});
+
+check('F-S7', 'same-code evaluation diagnostics are ordered by pointer in UTF-8 byte order: /inputs/10 before /inputs/2 (PLAN sort key; AUDIT F08; V-35)', () => {
+  const ins = Array.from({ length: 11 }, (_, i) => ({ ref: `DE-0001.i${i}`, type: 'enum', domain: ['X'] }));
+  const t = S1(ins, { i0: 'X' });
+  const res = ev(t, { 'DE-0001.i2': 'W', 'DE-0001.i10': 'W' });
+  expectError(res, [
+    { code: 'KF-E-314', pointer: '/inputs/10', input: 'DE-0001.i10', value: 'W' },
+    { code: 'KF-E-314', pointer: '/inputs/2', input: 'DE-0001.i2', value: 'W' },
+  ]);
+  const three = ev(t, { 'DE-0001.i9': 'W', 'DE-0001.i1': 'W', 'DE-0001.i10': 'W' });
+  assert.deepEqual(three.diagnostics.map((d) => d.pointer), ['/inputs/1', '/inputs/10', '/inputs/9']);
 });
 
 // ============================================================================================ existing fixture (F-A)
