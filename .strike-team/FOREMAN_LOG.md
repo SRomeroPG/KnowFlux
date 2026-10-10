@@ -120,3 +120,8 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - REQUIRED: D01 LOW (sparse predicate array -> raw TypeError; Foreman reproduced), T01 HIGH (intermediate exactness untested), T02-T05 MEDIUM, T06-T07 LOW (test gaps). Product arithmetic and proofs found sound.
 - E-0038 decided (eager evaluation with nulls; depth root=1; clamp with null x).
 - Incident: the P012 test auditor ran `taskkill /F /IM node.exe`, which can kill concurrent agents' node processes. Future auditor briefs forbid process-wide kills.
+
+## 2026-10-10 P012 remediate R01 -> hand off R02
+
+- Fresh conformance engineer: 13 case groups (only F-RM-D01 red). Fresh implementer: D01 fixed in the P012-appended block (P011 core unchanged; 0 deletions). Product commit 23889a5ea04494ec6884d90e01c0f3d8b7d1a848.
+- Foreman: P012 tests + conformance 203/203 with KF_P012_BOUNDARY=1; repro-p012-d01 -> LogicError INVALID_EXPRESSION.

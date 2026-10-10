@@ -108,11 +108,11 @@ phases:
     audit_round: 2
     accepted_audit: .strike-team/phases/P011-decision-table-logic/audits/AUDIT_R02.md
   P012:
-    status: CHANGES_REQUESTED
+    status: REAUDITING
     track: B
     depends_on: [P011]
     plan: .strike-team/phases/P012-formula-logic/PLAN.md
-    last_product_commit: e5bc9f216f4638a715c4c260f37bbb2d6cd08a92
+    last_product_commit: 23889a5ea04494ec6884d90e01c0f3d8b7d1a848
     audit_round: 1
     accepted_audit: null
   P013:
