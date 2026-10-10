@@ -1,6 +1,218 @@
-# Independently stated §55 P002 expectations for unaffected allocation behavior.
-# The operational registry is engine-created in tests.
+# P002 ID Registry - independently stated conformance slice (spec section 55, l.2103:
+# "El fixture es la definicion operativa de terminado").
+#
+# Written by the conformance engineer BEFORE any implementer code was read, from:
+#   .strike-team/phases/P002-id-registry/PLAN.md (incl. "Foreman decisions after planning"),
+#   knowledge-framework-spec-v2.1.md (l.298-321, 325-372, 1108-1120, 1742, 2075-2103),
+#   knowledge-framework-spec-v2.1-errata.md (E-0001..E-0004, E-0007, E-0009..E-0015).
+# Runner: test/conformance-p002-id-registry.test.mjs (engine API phase, E-0014: there is no kf
+# binary and no framework/conformance/expected/ runner yet; P028 ports this slice).
+#
+# P002 adds NO section-55 entities and no expected/ command line (PLAN "Fixture slice"):
+# the acme-formulation fixture is not changed and DIV is never populated by hand.
+# The registry events and entity files used by the scenarios are built by the helper code in
+# framework/conformance/p002-id-registry/, never copied from engine output.
 schema_version: 2.1
+phase: P002
+status: pending-implementation
+
+# Every key of case_index has at least one test whose title starts with the key (checked by the runner).
+# cites = spec line / errata entry / PLAN target the expectation is derived from.
+case_index:
+  F-A1: {targets: [V-01, V-07, V-08], cites: ["spec l.300", "spec l.304", "E-0012", "E-0015 D-05"], expect: "init + allocate BR,BR,DE,BR,CAP -> BR-0001,BR-0002,DE-0001,BR-0003,CAP-0001 provisional; one physical line per event; exact header"}
+  F-A2: {targets: [V-02], cites: ["spec l.300", "E-0012"], expect: "after BR-9999 comes BR-10000, BR-10001; DE-0001; seeded bytes stay an exact prefix; BR-12345 -> BR-12346"}
+  F-A3: {targets: [V-03, V-04], cites: ["spec l.300", "E-0004", "E-0012"], expect: "delete/rename/gap never reuses an ID; next = max suffix over all events + 1"}
+  F-A4: {targets: [V-05], cites: ["PLAN section 4.1", "spec l.153-163"], expect: "only the 11 core prefixes; others INVALID_PREFIX, registry unchanged"}
+  F-A5: {targets: [V-06], cites: ["PLAN public API contract (path rule)"], expect: "non-conforming repo paths INVALID_PATH, registry unchanged; near-misses accepted"}
+  F-A6: {targets: [V-07], cites: ["E-0012", "E-0007"], expect: "hostile and 300-char paths keep one physical line per event and round-trip"}
+  F-A7: {targets: [V-08], cites: ["PLAN allocateId contract"], expect: "allocation works outside Git, with no entity files"}
+  F-B1: {targets: [V-10], cites: ["spec l.304", "E-0013"], expect: "24 concurrent in-process allocations -> BR-0001..BR-0024, 24 lines"}
+  F-B2: {targets: [V-11], cites: ["spec l.304", "E-0013"], expect: "6 processes x 5 allocations -> 30 distinct contiguous IDs"}
+  F-B3: {targets: [V-12, V-13, V-14, V-15, V-16, V-17, V-22], cites: ["E-0013", "E-0015 D-04"], expect: "stale iff old AND same host AND pid dead; otherwise LOCK_TIMEOUT with lock and registry untouched; owner-less lock never broken"}
+  F-B4: {targets: [V-18, V-19, V-20, V-21], cites: ["E-0013", "PLAN lock and atomic write"], expect: "lock released on every path; rename failure leaves registry byte-identical and no tmp; EPERM/EBUSY/EACCES retried; other errors propagate unchanged"}
+  F-C1: {targets: [V-23], cites: ["E-0014", "E-0015 D-01", "E-0015 D-05"], expect: "missing registry never recreated (REGISTRY_MISSING); init refusals; empty registry bytes exact"}
+  F-C2: {targets: [V-24], cites: ["PLAN registry file (reader validity)"], expect: "INVALID_YAML / INVALID_REGISTRY, file unchanged; null and [] events accepted"}
+  F-C3: {targets: [V-25], cites: ["E-0012", "PLAN registry file (reader validity)"], expect: "each invalid event row is INVALID_REGISTRY; each valid near-miss reads"}
+  F-C4: {targets: [V-26], cites: ["E-0012"], expect: "duplicate provisional allocate replays; next ID skips it"}
+  F-C5: {targets: [V-27], cites: ["E-0007", "E-0015 D-05"], expect: "real git union merge keeps both allocate lines, parseable, next BR-0002; both-first-event variant too"}
+  F-C6: {targets: [V-28], cites: ["E-0012"], expect: "allocate after promote (any line order) replays"}
+  F-D1: {targets: [V-29], cites: ["spec l.315", "E-0001"], expect: "non-canonical entity stays provisional, nothing mutated"}
+  F-D2: {targets: [V-30, V-31, V-37], cites: ["spec l.316", "spec l.1117", "E-0009", "E-0011"], expect: "merge, fast-forward, squash each record promote with the first first-parent commit carrying the file with that id"}
+  F-D3: {targets: [V-32], cites: ["E-0001", "PLAN promoteIds contract"], expect: "explicit canonicalBranch: custom name works, main never assumed, bad values rejected, nothing changes"}
+  F-D4: {targets: [V-33], cites: ["E-0001", "E-0009"], expect: "promotion uses the canonical branch history, not the checked-out branch"}
+  F-D5: {targets: [V-34], cites: ["E-0009"], expect: "first-parent only; earlier commit with another id at the path does not count"}
+  F-D6: {targets: [V-34], cites: ["PLAN createGitHistoryReader contract"], expect: "shallow clone -> HISTORY_INCOMPLETE, nothing changes; full clone works"}
+  F-D7: {targets: [V-35], cites: ["E-0011", "PLAN promoteIds item 5"], expect: "repeat promotion is idempotent and writes nothing"}
+  F-D8: {targets: [V-36], cites: ["E-0004"], expect: "promote.path is the path at promotion"}
+  F-D9: {targets: [V-46], cites: ["E-0011"], expect: "restored provisional entity converges to permanent without a new event"}
+  F-D10: {targets: [V-47], cites: ["PLAN promoteIds item 5"], expect: "registry rename failure leaves registry and entities unchanged; all events of a call land in one registry write before any entity rewrite"}
+  F-D11: {targets: [V-30], cites: ["spec l.316", "E-0009"], expect: "an unpromoted entity present in the first canonical commit is promoted with that commit"}
+  F-D12: {targets: [V-32, V-34], cites: ["PLAN createGitHistoryReader contract"], expect: "default reader returns git rev-list --first-parent --reverse output, file text or null, rejects unresolved/dash-leading branches"}
+  F-D13: {targets: [V-31, V-34], cites: ["E-0009"], expect: "injected history reader: first sha whose file parses to a mapping with that id"}
+  F-E1: {targets: [V-38, V-45], cites: ["spec l.317", "E-0002", "E-0009", "E-0011", "E-0015 D-02"], expect: "two provisional colliders in different canonical commits: later renumbered, alias event, no KF-E-101"}
+  F-E2: {targets: [V-39], cites: ["E-0002", "E-0015 D-02"], expect: "same-commit tie resolved by ascending UTF-8 byte order of the repo path"}
+  F-E3: {targets: [V-40], cites: ["E-0002", "E-0015 D-02b", "E-0015 D-02c"], expect: "three colliders: one survivor, two aliases, fresh IDs in total order, exact event order"}
+  F-E4: {targets: [V-41], cites: ["E-0011", "E-0015 D-02"], expect: "new ID promoted by a later call, alias retained; alias chain recorded oldest first"}
+  F-E5: {targets: [V-42, V-45], cites: ["spec l.318", "spec l.1742", "E-0010", "E-0015 D-03c"], expect: "provisional vs permanent: KF-E-101 on the non-matching path only, no event, holder untouched, other IDs still promoted"}
+  F-E6: {targets: [V-43], cites: ["E-0010"], expect: "two permanent claims: KF-E-101 on the non-matching path only"}
+  F-E7: {targets: [V-44], cites: ["E-0004"], expect: "unrecorded move is KF-E-101; recorded move, name change and recreate at same path are clean"}
+  F-E8: {targets: [V-45], cites: ["spec l.317", "spec l.1742", "E-0012"], expect: "two provisional holders, no promote: provisional_collisions, not KF-E-101"}
+  F-E9: {targets: [V-46], cites: ["E-0011"], expect: "pending renumber is not a collision and converges without a new event"}
+  F-E10: {targets: [V-48], cites: ["E-0002", "E-0009", "PLAN design constraints"], expect: "identical bytes across independent builds, a clone, creation order, injected clock and hostname"}
+  F-E11: {targets: [V-49], cites: ["spec l.318", "spec l.371", "E-0004"], expect: "promote lines and holder paths never change; no ID reissued after delete/recreate"}
+  F-E12: {targets: [V-08, V-53], cites: ["spec l.304", "E-0015 D-03a"], expect: "unregistered ID: allocateId and promoteIds fail closed UNREGISTERED_ID, checkIdCollisions reports it"}
+  F-E13: {targets: [V-45], cites: ["PLAN entity files"], expect: "only knowledge/, changes/, divergences/ yaml/yml records are scanned"}
+  F-R1: {targets: [V-50], cites: ["spec l.319", "E-0003"], expect: "live holder wins; shadowed_alias warning names the alias target, no code key"}
+  F-R2: {targets: [V-51], cites: ["spec l.319", "E-0003"], expect: "alias-only resolution; unchanged after later canonical activity"}
+  F-R3: {targets: [V-52], cites: ["E-0003"], expect: "alias chain stops at the first live holder"}
+  F-R4: {targets: [V-53], cites: ["spec l.554", "E-0006 out of scope", "E-0015 D-03b"], expect: "unresolved/registered flags; INVALID_ID for non-bare addresses; ambiguous status with sorted candidates"}
+  F-R5: {targets: [V-25, V-53], cites: ["PLAN registry file", "TRIAGE T-10"], expect: "alias cycle registry: resolveId rejects INVALID_REGISTRY"}
+  F-S1: {targets: [V-55], cites: ["E-0011"], expect: "common.schema.json accepts id_alias as unique entityId array; rejects duplicates, bad ids, non-arrays; P001 corpus still valid"}
+  F-X1: {targets: [V-57], cites: ["E-0014"], expect: "no bin/ directory and no package.json bin entry"}
+
+tables:
+  core_prefixes: [CAP, BP, BR, DE, OUT, SC, EV, UNK, CHG, DIV, DSP]
+  invalid_prefixes: ["XYZ", "br", "POL", "ACT", "", "BR-", "BR ", "B"]
+  # Repo-relative path rule (PLAN public API contract).
+  invalid_paths:
+    - ""
+    - "/abs/x.yaml"
+    - "../x.yaml"
+    - "a/../b.yaml"
+    - "./a.yaml"
+    - "a//b.yaml"
+    - "a\\b.yaml"
+    - "C:/x.yaml"
+    - "a\nb.yaml"
+    - "a\tb.yaml"
+    - "a\u007fb.yaml"
+    - "a/./b.yaml"
+    - "a/"
+    - "."
+    - ".."
+  # Near-misses of the path rule: all valid.
+  valid_paths:
+    - "a.b/c..d.yaml"
+    - ".hidden/x.yaml"
+    - "..a/x.yaml"
+    - "a b/x y.yaml"
+    - "knowledge/x/rule.yaml"
+  hostile_paths:
+    - "knowledge/business-rules/comma, here/rule.yaml"
+    - "knowledge/business-rules/colon: here/rule.yaml"
+    - "knowledge/business-rules/hash # here/rule.yaml"
+    - "knowledge/business-rules/{brace}/rule.yaml"
+    - "knowledge/business-rules/[bracket]/rule.yaml"
+    - "knowledge/business-rules/quote\"d/rule.yaml"
+    - "knowledge/business-rules/single'quote/rule.yaml"
+    - "knowledge/business-rules/ leading-space/rule.yaml"
+    - "knowledge/business-rules/trailing-space /rule.yaml"
+    - "knowledge/business-rules/\u00e9/rule.yaml"
+    - "knowledge/business-rules/\u65e5\u672c/rule.yaml"
+    - "knowledge/business-rules/- dash/rule.yaml"
+    - "knowledge/business-rules/null/rule.yaml"
+  # F-C3: rows added to a valid base registry with allocate BR-0001@A, BR-0002@B, BR-0003@G.
+  # Placeholders <A> <B> <G> are replaced by the runner. Each row: INVALID_REGISTRY.
+  invalid_events:
+    - {name: unknown-op, lines: ['{op: delete, id: BR-0001}']}
+    - {name: allocate-permanent, lines: ['{op: allocate, id: BR-0004, id_status: permanent, path: <G>}']}
+    - {name: allocate-missing-status, lines: ['{op: allocate, id: BR-0004, path: <G>}']}
+    - {name: promote-missing-commit, lines: ['{op: promote, id: BR-0001, path: <A>}']}
+    - {name: allocate-extra-key, lines: ['{op: allocate, id: BR-0004, id_status: provisional, path: <G>, actor: x}']}
+    - {name: id-lowercase, lines: ['{op: allocate, id: br-0001, id_status: provisional, path: <G>}']}
+    - {name: id-unknown-prefix, lines: ['{op: allocate, id: XX-0001, id_status: provisional, path: <G>}']}
+    - {name: id-one-digit, lines: ['{op: allocate, id: BR-1, id_status: provisional, path: <G>}']}
+    - {name: id-three-digits, lines: ['{op: allocate, id: BR-001, id_status: provisional, path: <G>}']}
+    - {name: commit-abc, lines: ['{op: promote, id: BR-0001, path: <A>, commit: abc}']}
+    - {name: commit-uppercase, lines: ['{op: promote, id: BR-0001, path: <A>, commit: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}']}
+    - {name: commit-41-chars, lines: ['{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - name: two-promotes
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: promote, id: BR-0001, path: <A>, commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}'
+    - {name: promote-without-allocate, lines: ['{op: promote, id: BR-0009, path: <G>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - {name: alias-self, lines: ['{op: alias, from: BR-0001, to: BR-0001, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - {name: alias-to-unallocated, lines: ['{op: alias, from: BR-0001, to: BR-0009, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - {name: alias-from-unallocated, lines: ['{op: alias, from: BR-0009, to: BR-0001, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - name: alias-cycle-2
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: alias, from: BR-0002, to: BR-0001, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+    - name: alias-cycle-3
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: alias, from: BR-0002, to: BR-0003, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: alias, from: BR-0003, to: BR-0001, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+    - name: move-wrong-from
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: move, id: BR-0001, from: <G>, to: <B>}'
+    - {name: path-traversal, lines: ['{op: allocate, id: BR-0004, id_status: provisional, path: ../x.yaml}']}
+    - {name: non-string-value, lines: ['{op: allocate, id: BR-0004, id_status: provisional, path: 5}']}
+  # F-C3 / F-C4 / F-C6 near-misses: all VALID registries (read succeeds).
+  valid_events:
+    - {name: commit-64-hex, lines: ['{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}']}
+    - name: alias-chain-acyclic
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: alias, from: BR-0002, to: BR-0003, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+    - name: alias-two-targets
+      lines:
+        - '{op: alias, from: BR-0001, to: BR-0002, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: alias, from: BR-0001, to: BR-0003, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+    - name: move-chain
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: move, id: BR-0001, from: <A>, to: <G>}'
+        - '{op: move, id: BR-0001, from: <G>, to: <B>}'
+    - name: duplicate-provisional-allocate
+      lines:
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <B>}'
+    - name: allocate-after-promote
+      lines:
+        - '{op: promote, id: BR-0001, path: <A>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: allocate, id: BR-0001, id_status: provisional, path: <G>}'
+    - name: promote-before-its-allocate-line
+      lines:
+        - '{op: promote, id: BR-0004, path: <G>, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}'
+        - '{op: allocate, id: BR-0004, id_status: provisional, path: <G>}'
+  # F-E2 pairs: winner = smaller in ascending UTF-8 byte order of the repo path (E-0002).
+  tie_pairs:
+    - {name: upper-vs-lower, winner: "Z", loser: "a"}
+    - {name: ascii-vs-multibyte, winner: "z", loser: "\u00e9"}
+    - {name: dash-vs-slash, winner: "a-b", loser: "a"}
+  # F-C2 rows: exact registry file bytes and the expected code.
+  corrupt_registries:
+    - {name: unparsable-flow, text: "schema_version: 2.1\nevents: [invalid\n", code: INVALID_YAML}
+    - {name: empty-file, text: "", code: INVALID_REGISTRY}
+    - {name: wrong-schema-version, text: "schema_version: 2.0\nevents:\n", code: INVALID_REGISTRY}
+    - {name: missing-schema-version, text: "events:\n", code: INVALID_REGISTRY}
+    - {name: events-is-mapping, text: "schema_version: 2.1\nevents: {a: 1}\n", code: INVALID_REGISTRY}
+    - {name: event-not-mapping, text: "schema_version: 2.1\nevents:\n  - foo\n", code: INVALID_REGISTRY}
+  diagnostic_keys: [code, message, path, permanent_path, id, remediation, severity]
+  diagnostic: {code: KF-E-101, severity: E, remediation: "resoluci\u00f3n manual"}
+  invalid_addresses: ["br-1", "BR-0001#specified", "", "BR-001", "XYZ-0001", " BR-0001", "BR-0001 "]
+  # F-S1
+  schema_cases:
+    accepted: [{id_alias: ["BR-0001"], id_status: permanent}, {id_alias: ["BR-0001", "BR-0002"], id_status: permanent}]
+    rejected:
+      - {name: duplicate, id_alias: ["BR-0001", "BR-0001"]}
+      - {name: bad-id, id_alias: ["br-1"]}
+      - {name: unknown-prefix, id_alias: ["XX-0001"]}
+      - {name: not-an-array, id_alias: "BR-0001"}
+      - {name: not-a-string, id_alias: [1]}
+    schemas:
+      - [business-rule, knowledge/business-rules/BR-0001/rule.yaml]
+      - [capability, knowledge/capabilities/CAP-0001/capability.yaml]
+      - [change, changes/CHG-0001.yaml]
+      - [data-entity, knowledge/data/DE-0001/entity.yaml]
+      - [evidence, knowledge/evidence/EV-0001/evidence.yaml]
+      - [scenario, knowledge/scenarios/SC-0001/scenario.yaml]
+
+# Legacy checkpoint block (commit 0dddf47), kept verbatim and in its original array shape because the
+# checkpoint unit test test/p002-id-registry.test.mjs (implementer-owned; PLAN step 3.4 retires or updates it)
+# still reads it. It is not part of this slice: the slice is case_index/tables above. Every statement is still
+# true under the new contract (spec l.300 format, E-0012 per-prefix counter, provisional status l.308/l.315).
 cases:
   - name: first_business_rule
     prefix: BR
