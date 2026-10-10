@@ -1,0 +1,169 @@
+# P011 Decision Table Logic - independently stated conformance slice (spec section 55, l.2103:
+# "El fixture es la definicion operativa de terminado").
+#
+# Written by the conformance engineer BEFORE any implementer code was read, from:
+#   .strike-team/phases/P011-decision-table-logic/PLAN.md (incl. "Foreman decisions after planning"), TRIAGE.md,
+#   knowledge-framework-spec-v2.1.md (l.420-460, 576-635, 1600, 1734-1800, 1953-1956, 2075-2103),
+#   knowledge-framework-spec-v2.1-errata.md (E-0008, E-0014, E-0017..E-0022).
+# Runner: test/conformance-p011-decision-table.test.mjs (engine API phase; there is no kf binary and no
+# framework/conformance/expected/ runner yet - P028 ports this slice). Vectors and builders:
+# framework/conformance/p011-decision-table/.
+#
+# P011 adds NO section-55 entities and no expected/ command line (PLAN "Fixture slice"): acme-formulation and
+# spec-examples are read as data (F-A) and never changed. DIV is never populated by hand.
+# Division (divideDecimal, DIVISION_BY_ZERO, INVALID_PRECISION) is removed from P011 (E-0022 D-04): no case.
+schema_version: 2.1
+phase: P011
+status: pending-implementation
+
+# Every key of case_index has at least one test whose title starts with the key, and every test key is indexed
+# (checked by the runner, test "F-M"). cites = spec line / errata entry / PLAN target the expectation comes from.
+case_index:
+  F-E1: {targets: [V-22], cites: ["PLAN API contract (logic-errors.mjs)", "E-0014", "E-0021", "E-0022 D-04"], expect: "LogicError class; LOGIC_ERROR_CODES ascending, contains the listed codes, no KF- code, no division codes"}
+  F-N1: {targets: [V-01, V-02], cites: ["spec l.582", "E-0017"], expect: "compare/equals by numeric value; 400-digit and 2^53 pairs"}
+  F-N2: {targets: [V-02, V-03], cites: ["spec l.582", "E-0017"], expect: "exact add/subtract/multiply incl. 60-digit product"}
+  F-N3: {targets: [V-03], cites: ["PLAN P-07", "E-0017"], expect: "canonical minimal form, never -0"}
+  F-N4: {targets: [V-04], cites: ["spec l.583", "E-0017"], expect: "only ^-?[0-9]+(\\.[0-9]+)?$ strings parse; others INVALID_DECIMAL"}
+  F-N5: {targets: [V-03, V-04], cites: ["E-0017", "PLAN API contract (decimal.mjs)"], expect: "Decimal shape, isDecimal, non-Decimal arguments INVALID_ARGUMENT"}
+  F-U1: {targets: [V-07], cites: ["spec l.591", "spec l.596-599", "E-0018"], expect: "registry accepts the units.yaml shape; ids exact; no built-in unit"}
+  F-U2: {targets: [V-08], cites: ["spec l.596-599", "E-0018"], expect: "nine invalid registries are INVALID_UNITS; U0 is the near-miss"}
+  F-U3a: {targets: [V-09], cites: ["E-0018", "PLAN P-05"], expect: "missing/null/raw/hand-made registry is INVALID_ARGUMENT from check and evaluate"}
+  F-U3b: {targets: [V-09], cites: ["E-0018"], expect: "undeclared input unit UNKNOWN_UNIT; accepted once declared"}
+  F-R1: {targets: [V-10], cites: ["spec l.612", "E-0021", "E-0022 D-05"], expect: "accepted syntax matches as tabulated (unanchored, case-sensitive, code points, RE2 defaults)"}
+  F-R1b: {targets: [V-10], cites: ["E-0021", "E-0022 D-05"], expect: "counts up to 1000 and the empty pattern compile"}
+  F-R1c: {targets: [V-10], cites: ["PLAN API contract (regex-re2.mjs)"], expect: "compileRe2 on a non-string is INVALID_ARGUMENT"}
+  F-R2: {targets: [V-11], cites: ["spec l.612", "E-0021", "E-0022 D-05"], expect: "rejected constructs, syntax errors, unlisted escapes and the 100000-instruction cap do not compile; near-misses compile"}
+  F-R2b: {targets: [V-11, V-34], cites: ["spec l.612", "spec l.1770", "E-0021"], expect: "as matches pattern: exactly one KF-E-315 at the pattern pointer; accepted patterns clean"}
+  F-R2c: {targets: [V-11], cites: ["PLAN P-03", "spec l.1770"], expect: "evaluation of a table with KF-E-315 is status error, no row evaluated"}
+  F-R3a: {targets: [V-12], cites: ["spec l.612", "PLAN V-12"], expect: "six pathological patterns finish in < 5 s through searchRe2 with the stated results"}
+  F-R3b: {targets: [V-12], cites: ["spec l.612", "PLAN V-12"], expect: "same through evaluateDecisionTable"}
+  F-R3c: {targets: [V-12], cites: ["E-0022 D-05"], expect: "(a{1000}){1000} and triple nesting are rejected quickly; (a{100}){100} compiles"}
+  F-O1: {targets: [V-14], cites: ["spec l.622", "E-0019"], expect: "literal on enum"}
+  F-O2: {targets: [V-14], cites: ["spec l.622", "spec l.629", "E-0019"], expect: "literal on quantity (by value)"}
+  F-O3: {targets: [V-14], cites: ["spec l.622"], expect: "literal on boolean"}
+  F-O4: {targets: [V-14], cites: ["spec l.622", "E-0017"], expect: "literal on decimal (4.20 = 4.2)"}
+  F-O5: {targets: [V-14], cites: ["spec l.623", "E-0017"], expect: "eq by value incl. -0"}
+  F-O6: {targets: [V-14], cites: ["spec l.623"], expect: "ne"}
+  F-O7: {targets: [V-14], cites: ["spec l.623"], expect: "lt"}
+  F-O8: {targets: [V-14], cites: ["spec l.623"], expect: "lte"}
+  F-O9: {targets: [V-14], cites: ["spec l.623", "E-0017"], expect: "gt numeric not lexical"}
+  F-O10: {targets: [V-14], cites: ["spec l.623"], expect: "gte"}
+  F-O11a: {targets: [V-14], cites: ["spec l.623", "E-0019"], expect: "lte on quantity"}
+  F-O11b: {targets: [V-14], cites: ["spec l.623", "E-0019"], expect: "lt on quantity boundary"}
+  F-O11c: {targets: [V-14], cites: ["spec l.623", "E-0019"], expect: "gt on quantity boundary"}
+  F-O11d: {targets: [V-14], cites: ["spec l.623", "E-0019"], expect: "gte on quantity boundary"}
+  F-O12: {targets: [V-14], cites: ["spec l.624"], expect: "in on enum"}
+  F-O13: {targets: [V-14], cites: ["spec l.624", "E-0017"], expect: "in on decimal by value"}
+  F-O14: {targets: [V-14], cites: ["spec l.624"], expect: "not_in"}
+  F-O15: {targets: [V-14], cites: ["spec l.624", "E-0019"], expect: "in on quantity by value"}
+  F-O16a: {targets: [V-14], cites: ["spec l.625"], expect: "between inclusive at both ends"}
+  F-O16b: {targets: [V-14], cites: ["spec l.625"], expect: "between degenerate range"}
+  F-O17: {targets: [V-14], cites: ["spec l.625", "E-0019"], expect: "between on quantity"}
+  F-O18: {targets: [V-14, V-22], cites: ["E-0019"], expect: "between min > max is INVALID_RANGE from check and evaluate"}
+  F-O19: {targets: [V-14], cites: ["spec l.626", "E-0021"], expect: "matches anchored"}
+  F-O20: {targets: [V-14], cites: ["spec l.626", "E-0021"], expect: "matches unanchored"}
+  F-O21a: {targets: [V-14, V-18], cites: ["spec l.627", "spec l.607"], expect: "is_null true: absent and null"}
+  F-O21b: {targets: [V-14, V-18], cites: ["spec l.627", "spec l.607"], expect: "is_null false"}
+  F-O22: {targets: [V-15], cites: ["spec l.621"], expect: "all"}
+  F-O23: {targets: [V-15], cites: ["spec l.621"], expect: "any"}
+  F-O24: {targets: [V-15], cites: ["spec l.621"], expect: "not"}
+  F-O25: {targets: [V-15], cites: ["E-0019"], expect: "several keys in one mapping are a conjunction"}
+  F-O26: {targets: [V-15], cites: ["spec l.621"], expect: "nesting of all/any/not"}
+  F-B1: {targets: [V-16], cites: ["E-0019"], expect: "when key by full ref"}
+  F-B2: {targets: [V-16], cites: ["E-0019", "spec l.448-451"], expect: "when key by suffix"}
+  F-B3: {targets: [V-16], cites: ["E-0019"], expect: "UNBOUND_FIELD at any nesting"}
+  F-B4: {targets: [V-16], cites: ["E-0019"], expect: "AMBIGUOUS_FIELD for shared suffix; full ref disambiguates"}
+  F-B5: {targets: [V-16], cites: ["E-0019"], expect: "two keys = conjunction"}
+  F-B3b1: {targets: [V-16], cites: ["E-0022 D-02"], expect: "supplied values bind by suffix"}
+  F-B3b2: {targets: [V-16], cites: ["E-0022 D-02"], expect: "unbound supplied key is UNBOUND_FIELD"}
+  F-B3b3: {targets: [V-16], cites: ["E-0022 D-02"], expect: "supplied key collisions are AMBIGUOUS_FIELD"}
+  F-B3b4: {targets: [V-16], cites: ["E-0022 D-02", "PLAN implementation step 7"], expect: "__proto__/constructor supplied keys are UNBOUND_FIELD; no pollution"}
+  F-L1: {targets: [V-18], cites: ["spec l.607", "E-0019"], expect: "fourteen tables, every matcher false on absent -> default row"}
+  F-L2: {targets: [V-18], cites: ["spec l.606", "E-0019"], expect: "explicit null deep-equals absent"}
+  F-L3: {targets: [V-18], cites: ["E-0019"], expect: "eq: null is false"}
+  F-L4: {targets: [V-18], cites: ["spec l.607"], expect: "is_null true on absent"}
+  F-L5: {targets: [V-18], cites: ["E-0019"], expect: "not over a null comparison is true; contrast with ne"}
+  F-L6: {targets: [V-18], cites: ["E-0019"], expect: "any/all over absent inputs"}
+  F-L7: {targets: [V-18], cites: ["spec l.606"], expect: "null is neither zero nor false"}
+  F-D1: {targets: [V-19], cites: ["spec l.608", "spec l.1769", "E-0019", "PLAN P-04"], expect: "supplied out-of-domain enum -> status error, KF-E-314 at /inputs/<i>"}
+  F-D2: {targets: [V-19, V-34], cites: ["E-0019", "spec l.1769"], expect: "static KF-E-314 pointers for literal, eq, ne, in, not_in, not; near-misses clean"}
+  F-D3: {targets: [V-19], cites: ["PLAN P-03"], expect: "static KF-E-314 blocks evaluation"}
+  F-Q1: {targets: [V-20, V-34], cites: ["spec l.589", "spec l.1765", "E-0019"], expect: "static KF-E-310 for another unit; near-miss clean"}
+  F-Q2: {targets: [V-20], cites: ["spec l.591"], expect: "same-family unit is still KF-E-310"}
+  F-Q3: {targets: [V-20], cites: ["E-0019"], expect: "bare decimal on quantity input: found_unit null"}
+  F-Q4: {targets: [V-20], cites: ["E-0019"], expect: "quantity on decimal input: expected_unit null"}
+  F-Q5: {targets: [V-20], cites: ["E-0019"], expect: "KF-E-310 pointers inside in, between and literal form"}
+  F-Q6: {targets: [V-20, V-09], cites: ["E-0018", "spec l.591"], expect: "unknown unit throws; declared different unit is KF-E-310 (ids not dimensions)"}
+  F-Q7: {targets: [V-21], cites: ["spec l.589", "E-0019"], expect: "runtime unit mismatch -> status error KF-E-310 source value"}
+  F-Q8: {targets: [V-21], cites: ["E-0019"], expect: "bare scalar / quantity mix-ups are KF-E-310"}
+  F-Q9: {targets: [V-21], cites: ["E-0019"], expect: "right unit evaluates"}
+  F-Q10: {targets: [V-21], cites: ["spec l.591", "E-0018"], expect: "convertible pair is still KF-E-310"}
+  F-Q11a: {targets: [V-09], cites: ["E-0021"], expect: "then quantities with declared units accepted verbatim; undeclared UNKNOWN_UNIT"}
+  F-Q11b: {targets: [V-09], cites: ["E-0022 D-07"], expect: "nested {value, unit} in then is a quantity: UNKNOWN_UNIT"}
+  F-Q11c: {targets: [V-22], cites: ["E-0022 D-07", "E-0017"], expect: "nested then quantity needs a decimal-string value"}
+  F-Q11d: {targets: [V-09], cites: ["E-0022 D-07"], expect: "near-miss: other key sets are opaque"}
+  F-Y1: {targets: [V-22], cites: ["E-0019"], expect: "UNBOUND_FIELD from check and evaluate"}
+  F-Y2: {targets: [V-22], cites: ["E-0019"], expect: "AMBIGUOUS_FIELD"}
+  F-Y3: {targets: [V-17], cites: ["E-0019", "E-0022 D-08"], expect: "{} nested in all/any/not is EMPTY_PREDICATE"}
+  F-Y3a: {targets: [V-17], cites: ["E-0022 D-08"], expect: "top-level when: {} is an unconditional non-default row"}
+  F-Y3b: {targets: [V-17], cites: ["E-0022 D-03"], expect: "all: [] / any: [] are EMPTY_PREDICATE"}
+  F-Y4a: {targets: [V-22], cites: ["E-0019"], expect: "TYPE_MISMATCH for ordering operators on enum/string/boolean"}
+  F-Y4b: {targets: [V-22], cites: ["E-0021", "PLAN P-04"], expect: "TYPE_MISMATCH for wrong JS type of a supplied string/boolean value"}
+  F-Y5a: {targets: [V-22], cites: ["E-0017"], expect: "INVALID_DECIMAL in table literals"}
+  F-Y5b: {targets: [V-22], cites: ["E-0017"], expect: "INVALID_DECIMAL in supplied values"}
+  F-Y6: {targets: [V-22], cites: ["E-0019"], expect: "INVALID_RANGE"}
+  F-Y7: {targets: [V-22, V-26], cites: ["E-0020"], expect: "DUPLICATE_DEFAULT"}
+  F-Y8: {targets: [V-22], cites: ["E-0021"], expect: "DUPLICATE_RULE_ID"}
+  F-Y9: {targets: [V-22], cites: ["E-0021"], expect: "UNSUPPORTED_INPUT_TYPE"}
+  F-Y10: {targets: [V-22], cites: ["E-0021"], expect: "INVALID_INPUT_DECLARATION"}
+  F-Y11: {targets: [V-22], cites: ["E-0022 D-01"], expect: "INVALID_TABLE: kind, rules, inputs"}
+  F-Y11b: {targets: [V-22], cites: ["E-0022 D-01"], expect: "INVALID_TABLE: malformed matchers"}
+  F-Y12: {targets: [V-22], cites: ["PLAN API contract (INVALID_ARGUMENT)"], expect: "bad values / proofLimit are INVALID_ARGUMENT"}
+  F-H1: {targets: [V-23, V-26], cites: ["E-0020"], expect: "first: document order; default position-independent; no match is null"}
+  F-H2: {targets: [V-25, V-26], cites: ["E-0020"], expect: "collect: all non-default in order, [default], []"}
+  F-H3: {targets: [V-24, V-26], cites: ["E-0020"], expect: "unique with disjoint rows"}
+  F-H4: {targets: [V-24], cites: ["spec l.633", "E-0020"], expect: "unique at evaluation: KF-E-312 proof evaluation"}
+  F-H5: {targets: [V-26], cites: ["E-0020"], expect: "default never overlaps"}
+  F-H6: {targets: [V-26], cites: ["E-0020", "E-0021"], expect: "duplicate default / rule id under every hit policy"}
+  F-H7: {targets: [V-27], cites: ["E-0021"], expect: "then verbatim, isolated deep copy"}
+  F-X1: {targets: [V-28], cites: ["spec l.634", "E-0020"], expect: "default row satisfies exhaustive: true"}
+  F-X2: {targets: [V-30, V-34], cites: ["spec l.445-455", "spec l.634", "E-0008(d)"], expect: "BR-0037 shape: one KF-E-311 non_enum_input with remediation"}
+  F-X3: {targets: [V-29, V-34], cites: ["spec l.634"], expect: "enum-only proof by enumeration"}
+  F-X4: {targets: [V-29], cites: ["spec l.634", "E-0020"], expect: "uncovered_tuple with witness"}
+  F-X5a: {targets: [V-29], cites: ["spec l.634", "E-0020"], expect: "single uncovered tuple of a product"}
+  F-X5b: {targets: [V-29], cites: ["E-0022 D-06"], expect: "first uncovered tuple, last input fastest"}
+  F-X6a: {targets: [V-29], cites: ["spec l.634"], expect: "product 256 inclusive; 16x16"}
+  F-X6b: {targets: [V-30], cites: ["spec l.634", "E-0020"], expect: "over_limit with product and limit; proofLimit parameter"}
+  F-X7: {targets: [V-30], cites: ["E-0020"], expect: "boolean/decimal/string/quantity inputs are non_enum_input"}
+  F-X8: {targets: [V-30], cites: ["spec l.608", "spec l.634"], expect: "missing_domain"}
+  F-X8b: {targets: [V-30], cites: ["PLAN KF-E-311 row"], expect: "reason precedence by inputs[] order, then product"}
+  F-X9: {targets: [V-28], cites: ["spec l.634", "E-0020"], expect: "exhaustive false/absent unchecked"}
+  F-X10: {targets: [V-30], cites: ["PLAN P-03"], expect: "KF-E-311 does not block evaluation"}
+  F-X11: {targets: [V-30], cites: ["PLAN API contract"], expect: "invalid proofLimit INVALID_ARGUMENT"}
+  F-X12: {targets: [V-29], cites: ["E-0022 D-08"], expect: "when: {} does not satisfy default but covers every tuple"}
+  F-V1: {targets: [V-31], cites: ["spec l.633", "E-0020"], expect: "enumeration overlap: witness, first two rows, pointer"}
+  F-V2: {targets: [V-31, V-34], cites: ["E-0020"], expect: "enumeration near-miss clean"}
+  F-V3: {targets: [V-31], cites: ["E-0020"], expect: "enumeration exact for ne"}
+  F-V4: {targets: [V-31], cites: ["E-0020"], expect: "limit boundary; fail closed beyond it"}
+  F-V5: {targets: [V-31], cites: ["E-0020"], expect: "default alone never overlaps"}
+  F-V6: {targets: [V-32, V-34], cites: ["E-0020"], expect: "eleven provably disjoint pairs, both orders"}
+  F-V6b: {targets: [V-32, V-34], cites: ["E-0020"], expect: "seven overlapping pairs: one KF-E-312 not_proven_disjoint"}
+  F-V6c: {targets: [V-32], cites: ["E-0020", "PLAN KF-E-312 row"], expect: "three mutually overlapping rows -> three diagnostics in pair order"}
+  F-V7: {targets: [V-33], cites: ["E-0020"], expect: "fail closed on any/not/matches/ne/not_in/no shared field"}
+  F-V8: {targets: [V-31], cites: ["E-0022 D-06"], expect: "overlap witness enumeration order"}
+  F-V9: {targets: [V-31], cites: ["E-0022 D-08"], expect: "when: {} overlaps every other non-default row; default beside it is fine"}
+  F-K: {targets: [V-34], cites: ["spec l.1765-1770", "E-0021"], expect: "positive and near-miss per in-scope KF- code (KF-E-010 is not produced: E-0022 D-01)"}
+  F-S1: {targets: [V-35], cites: ["PLAN sort key", "spec l.1765-1770"], expect: "all five codes in one table in sort order"}
+  F-S2a: {targets: [V-35], cites: ["PLAN design constraints (determinism)"], expect: "key-order permutation gives identical lists"}
+  F-S2b: {targets: [V-35], cites: ["PLAN design constraints (determinism)"], expect: "fresh process gives byte-identical JSON"}
+  F-S3: {targets: [V-37], cites: ["PLAN design constraints (pure functions)"], expect: "deep-frozen inputs; fresh outputs"}
+  F-S4: {targets: [V-35], cites: ["spec l.1600", "spec l.1766"], expect: "severity E; remediation only on KF-E-311; no error key"}
+  F-S5a: {targets: [V-38], cites: ["spec l.1765-1770", "PLAN P-09"], expect: "catalog constants"}
+  F-S5b: {targets: [V-35, V-38], cites: ["PLAN Diagnostic sort key"], expect: "sortDiagnostics key and UTF-8 byte order"}
+  F-A1: {targets: [V-36], cites: ["spec l.2077", "PLAN F-A1"], expect: "acme BR-0001 specified v1 checks clean and evaluates"}
+  F-A2: {targets: [V-36], cites: ["spec l.2077", "PLAN F-A2"], expect: "acme BR-0001 specified v2"}
+  F-A3: {targets: [V-36], cites: ["E-0022 D-08", "PLAN F-A3"], expect: "observed BR-0001 (when: {}) checks clean, always r1"}
+  F-A4: {targets: [V-36], cites: ["spec l.445-455", "E-0008(d)", "PLAN F-A4"], expect: "spec example 10.3: exactly KF-E-311; evaluation outcomes"}
+  F-A5: {targets: [V-40], cites: ["PLAN F-A5"], expect: "no change to acme-formulation, spec-examples, expected/, bin/, package.json, eslint config"}
+  F-P1: {targets: [V-06], cites: ["PLAN F-P1"], expect: "modules import only engine siblings"}
+  F-P2: {targets: [V-06, V-13], cites: ["spec l.582", "spec l.612", "PLAN F-P2"], expect: "banned identifiers absent"}

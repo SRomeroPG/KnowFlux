@@ -1,0 +1,9 @@
+# Registry U2 (PLAN "Notation"): U1 plus bare `percent` (declared, same dimension as percent_mass).
+# Used to prove that units compare by `id`, never by `dimension` (E-0018, spec l.591).
+units:
+  - {id: percent_mass, dimension: mass_fraction, symbol: "% m/m"}
+  - {id: ppm_mass, dimension: mass_fraction, symbol: "ppm"}
+  - {id: percent_volume, dimension: volume_fraction, symbol: "% v/v"}
+  - {id: kg, dimension: mass, symbol: "kg"}
+  - {id: percent, dimension: mass_fraction, symbol: "%"}
+conversions: []

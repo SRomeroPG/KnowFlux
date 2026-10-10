@@ -1,0 +1,143 @@
+# RE2-subset vectors (PLAN F-R1, F-R2; spec l.612; E-0021; E-0022 D-05).
+# Patterns are single-quoted (backslashes literal). Texts: string, or {repeat: [s, n]}.
+
+# F-R1: [pattern, text, searchRe2(compile(pattern), text)]; unanchored, case-sensitive, code points (E-0021)
+match:
+  - ['abc', 'xxabcxx', true]
+  - ['abc', 'ab', false]
+  - ['^abc$', 'abc', true]
+  - ['^abc$', 'abcd', false]
+  - ['^abc$', 'xabc', false]
+  - ['a', 'A', false]
+  - ['a', 'a', true]
+  - ['\d{3}-\d{2}', 'ab123-45x', true]
+  - ['\d{3}-\d{2}', '12-345', false]
+  - ['\D', '123', false]
+  - ['\D', 'a1', true]
+  - ['\w+', '---', false]
+  - ['\w+', '_', true]
+  - ['\W', 'abc_9', false]
+  - ['\s', 'a b', true]
+  - ['\s', 'ab', false]
+  - ['\S', '   ', false]
+  - ['[A-Z]{3}[0-9]{2,4}', 'XYZ123', true]
+  - ['[A-Z]{3}[0-9]{2,4}', 'XY123', false]
+  - ['[A-Z]{3}[0-9]{2,4}', 'XYZ1', false]
+  - ['[^0-9]', '123', false]
+  - ['[^0-9]', '12a', true]
+  - ['[a-c]', 'd', false]
+  - ['[a-c]', 'b', true]
+  - ['a|b', 'xbx', true]
+  - ['a|b', 'xcx', false]
+  - ['^(a|b)*c?$', 'abab', true]
+  - ['^(a|b)*c?$', 'abc', true]
+  - ['^(a|b)*c?$', 'abcc', false]
+  - ['(?:ab)+$', 'xabab', true]
+  - ['(?:ab)+$', 'ababx', false]
+  - ['a{2,3}', 'a', false]
+  - ['a{2,3}', 'aa', true]
+  - ['^a{2}$', 'aaa', false]
+  - ['^a{2}$', 'aa', true]
+  - ['^a{2,}$', 'aaaa', true]
+  - ['^a{2,}$', 'a', false]
+  - ['x*', '', true]
+  - ['a+?', 'baab', true]
+  - ['^a+?$', 'aaa', true]
+  - ['\.', 'a.b', true]
+  - ['\.', 'ab', false]
+  - ['\(\)', 'f()', true]
+  - ['\', 'a\b', true]
+  - ['^$', '', true]
+  - ['^$', 'a', false]
+  - ['a.c', 'abc', true]
+  - ['a.c', 'ac', false]
+  - ['é', 'café', true]
+  - ['^caf.$', 'café', true]
+  - ['^.$', '😀', true]
+  - ['^..$', '😀', false]
+  - ['a{1000}', {repeat: ['a', 1000]}, true]
+  - ['a{1000}', {repeat: ['a', 999]}, false]
+  # D-05 (E-0022): RE2 defaults, ASCII classes, listed escapes, empty pattern
+  - ['a.c', "a\nc", false]
+  - ['^abc$', "abc\n", false]
+  - ['^abc$', "abc", true]
+  - ['^\w$', 'é', false]
+  - ['^\w$', 'a', true]
+  - ['\d', '٣', false]
+  - ['\D', '٣', true]
+  - ['\W', 'é', true]
+  - ['\s', ' ', true]
+  - ['\s', "\n", true]
+  - ['\s', " ", false]
+  - ['\S', " ", true]
+  - ['\n', "a\nb", true]
+  - ['\n', 'a b', false]
+  - ['\t', "a\tb", true]
+  - ['\r', "a\rb", true]
+  - ['\f', "a\fb", true]
+  - ['\v', "a\u000bb", true]
+  - ['', 'abc', true]
+  - ['', '', true]
+
+# F-R1: patterns that must compile (limits inclusive)
+compile_ok:
+  - 'a{1000,}'
+  - 'a{0,1000}'
+  - 'a{1000}'
+  - ''
+  - '(a{100}){100}'
+
+# F-R2: compileRe2(p).ok === false; table check returns exactly one KF-E-315 for each
+rejected:
+  # named by E-0021
+  - '(a)\1'
+  - '(?=a)'
+  - '(?!a)'
+  - '(?<=a)'
+  - '(?<!a)'
+  - '(?P<n>a)'
+  - '(?<n>a)'
+  - '(?i)a'
+  - '(?s:a)'
+  - '\p{L}'
+  - '(?>a)'
+  - 'a++'
+  - 'a*+'
+  - 'a{1001}'
+  - 'a{1,1001}'
+  - 'a{0,1001}'
+  # plain syntax errors
+  - '('
+  - ')'
+  - '(a'
+  - '[a'
+  - '[z-a]'
+  - 'a{3,2}'
+  - '*a'
+  - '+'
+  - 'a|*'
+  - '\'
+  # D-05 (E-0022): unlisted constructs are KF-E-315
+  - 'a**'
+  - '\b'
+  - '\B'
+  - '\A'
+  - '\z'
+  - '\x41'
+  - '[[:alpha:]]'
+  # D-05: compiled program larger than 100000 instructions
+  - '(a{1000}){1000}'
+  - '((a{1000}){1000}){1000}'
+
+# F-R2 near-misses: accepted
+accepted:
+  - '(a)1'
+  - '(?:a)'
+  - 'a{1000}'
+  - '[a-z]+?'
+  - '\1'
+  - '(a*)*'
+  - '(a+)+$'
+  - 'a?'
+  - '\.'
+  - ''
