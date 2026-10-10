@@ -54,3 +54,11 @@ Baseline at 8dee230: build ok, lint ok, test 152/152.
 - Implementer's fail-closed choices on TRIAGE N-xx items accepted as within the PLAN's latitude (listed in P011 HANDOFF).
 - Foreman verification at dad4d5a on main: build ok, lint ok, npm test 505/505, git diff --check clean. Product commit dad4d5a. Worktree removed after confirming byte-identical copies; `npm run lint` clean again.
 - P002 audit R01: spec-compliance and algorithm-determinism auditors returned; Foreman reproduced F01/D02 (id_alias erased after move), F02 (alias renumbering a permanent holder accepted) and D01 (union merge of two idempotent promotions -> duplicate promote -> INVALID_REGISTRY). D01 is a defect in E-0012 itself; decided E-0024 (amends E-0012/E-0016; canonical ref resolution). test-conformance auditor still running.
+
+## 2026-10-10 P011 audit R01 -> CHANGES_REQUESTED
+
+- Auditors: spec-compliance, algorithm-determinism, test-conformance (sonnet, fresh, blind pass confirmed).
+- 11 REQUIRED findings: F01 HIGH regex compile hang on zero-width nested repeats; F02 MEDIUM class-copy compile cost; F03 MEDIUM overlap proof ignores absent inputs (E-0025); F04-F06 LOW (E-0019/E-0025 unit rule, binding ambiguity, escape whitelist); F07-F11 test gaps proven by surviving mutants. Foreman reproduced F01, F02, F03 and confirmed F07/F09 fixture gaps.
+- Errata decided: E-0025 (amends E-0020, clarifies E-0019), E-0026.
+- Remediation: fresh conformance engineer first (new cases), then fresh implementer.
+- `consecutive_failed_rounds` is now tracked per phase in STATE.yaml.

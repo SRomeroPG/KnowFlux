@@ -36,6 +36,8 @@ Purpose: record decisions on points the frozen specification (`knowledge-framewo
 | E-0022 | Decision-table details from P011 planning (amends E-0019 on `when: {}`) | DECIDED_BY_FOREMAN | LOW | P011, P012, P014 |
 | E-0023 | P002 implementation details: cross-ID renumber order, ambiguous result fields, stale-lock break | DECIDED_BY_FOREMAN | MEDIUM | P002 |
 | E-0024 | Registry replay after real merges; alias projection across moves; canonical ref resolution (amends E-0012, E-0016) | DECIDED_BY_FOREMAN | MEDIUM | P002, P007 |
+| E-0025 | Absent inputs in the static proofs; "bare scalar" in the unit rule (amends E-0020, clarifies E-0019) | DECIDED_BY_FOREMAN | LOW | P011, P014 |
+| E-0026 | Literal `null` operands in `ne`, `in`, `not_in`; regex program size counts the final match | DECIDED_BY_FOREMAN | LOW | P011, P014 |
 
 ---
 
@@ -685,3 +687,48 @@ No semantic decision is made except where stated. Each item records a defect in 
 **Decided**: 2026-10-10 by Foreman (P002 audit R01)
 **Ratified**: pending
 **Affects.** P002, P007.
+
+---
+
+## E-0025 — Absent inputs in the static proofs; "bare scalar" in the unit rule (amends E-0020, clarifies E-0019)
+
+**Clauses**
+- l.607: "Toda comparación con un operando `null` evalúa a `false`, salvo `is_null`."
+- l.633: "`unique` **SHALL** verificar ausencia de solapamiento → `KF-E-312`."
+- l.634: "... salvo que todos los inputs sean enums de dominio finito y el producto cartesiano de sus dominios sea ≤ `logic.exhaustiveness_proof_limit` (default `256`), en cuyo caso el engine enumera y prueba cobertura total."
+- l.628: "value     := scalar | quantity"; E-0019: "a quantity against a bare scalar (either direction), is `KF-E-310`".
+
+**Question.** (1) P011 audit R01 (F02): E-0020's enumeration ranges over declared domain values only, so a `unique` table whose rows can both match an absent input (via `not` or `is_null`) passes the static check and then fails at evaluation with `KF-E-312`; likewise an "exhaustive" enum table returns no match for an absent input. (2) Does "bare scalar" in E-0019 include enum, string and boolean values, or only decimals?
+
+**Decision.**
+1. **Overlap proof includes absence.** For the `unique` overlap proof by enumeration (E-0020 (a)), each input ranges over its domain values plus `null` (absent), in that order (`null` last), with the D-06 order otherwise unchanged. Enumeration applies when the product of the domain sizes is ≤ the limit (l.634 wording, unchanged) **and** the product of (domain size + 1) is ≤ the limit; otherwise the interval/set reasoning of E-0020 (b) applies, which already fails closed for rows containing `not` or `is_null` (the only matchers that can match `null`, l.607). A witness tuple may contain `null`.
+2. **Coverage proof stays over domains.** The exhaustiveness proof (l.634) enumerates domain values only, as written ("producto cartesiano de sus dominios"); an absent input is outside the coverage guarantee and may evaluate to no match. This is recorded, not changed.
+3. **"Bare scalar" means any non-quantity value.** A quantity compared with any non-quantity value — decimal, string, boolean or enum value — in either direction (literal versus declared input type, or supplied value versus declared input type) is `KF-E-310`, statically and at evaluation, as E-0019 states. `TYPE_MISMATCH` remains for the other type misuses E-0019 lists (ordering operators on non-numeric inputs, `matches` on non-strings).
+
+**Rationale.** (1) makes the static verification demanded by l.633 sound with respect to evaluation, at no cost for tables without `not`/`is_null`; (2) keeps l.634's literal domain product; (3) is the literal reading of E-0019 and of l.628.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 audit R01)
+**Ratified**: pending
+**Affects.** P011, P014.
+
+---
+
+## E-0026 — Literal `null` operands in `ne`, `in`, `not_in`; regex program size counts the final match
+
+**Clauses**
+- l.607: "Toda comparación con un operando `null` evalúa a `false`, salvo `is_null`."
+- l.624: "| { in|not_in: [value] }"; E-0019 (null semantics); E-0022 D-05 ("compiled program exceeds 100000 instructions").
+
+**Question.** (1) For a non-null input, what do `ne: null`, `in: [..., null, ...]` and `not_in: [..., null, ...]` evaluate to? (2) Does the final match instruction count toward the 100000-instruction cap? (P011 audit R01, T04/T05)
+
+**Decision.**
+1. `ne: null` is `false` (a comparison with a `null` operand, l.607). `in` is true iff the input is non-null and equals some non-null list element (a `null` element never matches). `not_in` is true iff the input is non-null and every list element is non-null and differs from the input; a `null` element therefore makes `not_in` false. These are the element-wise readings of l.607 with `in` as a disjunction of `eq` and `not_in` as a conjunction of `ne`.
+2. The cap counts every instruction of the compiled program, including the final match: a program of exactly 100000 instructions compiles; 100001 is `KF-E-315`.
+
+**Reversibility.** LOW.
+**Status.** DECIDED_BY_FOREMAN
+**Decided**: 2026-10-10 by Foreman (P011 audit R01)
+**Ratified**: pending
+**Affects.** P011, P014.
