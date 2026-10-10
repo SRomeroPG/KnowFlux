@@ -119,7 +119,7 @@ test('§11.4 l.612 (E-0022 D-05): unlisted constructs and syntax errors are not 
     '[[:alpha:]]', '[[:^digit:]]', '[a-\\d]', '[\\d-z]', '[z-a]', '[a', '[', '[^', '[]', '(', ')', '(a', 'a)', '(?', '(?:', '(?:a',
     'a{3,2}', 'a{', 'a{,5}', 'a{x}', 'a{2,x}', '{2}', '*a', '+', '?', 'a|*', '|*', '(*)', '^*', '$+', '\\', 'a\\', '[\\', '\\_', '\\é',
   ]) rejected(p);
-  assert.equal(matches('\\.\\*\\+\\?\\|\\(\\)\\[\\]\\{\\}\\^\\$\\-\\\\\\/', '.*+?|()[]{}^$-\\/'), true);
+  assert.equal(matches('\\.\\*\\+\\?\\|\\(\\)\\[\\]\\{\\}\\^\\$\\-\\\\', '.*+?|()[]{}^$-\\'), true);
 });
 
 test('§11.4 l.612: a compiled program above 100000 instructions is rejected, the bound is checked before building it', () => {
@@ -209,4 +209,90 @@ test('§11.4 l.612: the engine never builds or applies a host RegExp from a user
       assert.doesNotMatch(source, pattern, `${file} contains ${pattern}`);
     }
   }
+});
+
+// ------------------------------------------------------------------------------------------ R01 remediation
+test('§11.4 l.612 (E-0022 D-05, AUDIT R01 F06): only escaped metacharacters, "-", \\n \\t \\r \\f \\v and class escapes are accepted', () => {
+  for (const [pattern, withChar, without] of [
+    ['\\-', 'a-b', 'ab'], ['\\.', 'a.b', 'ab'], ['\\{', 'a{b', 'ab'], ['\\}', 'a}b', 'ab'], ['\\\\', 'a\\b', 'ab'], ['\\^', 'a^b', 'ab'],
+    ['\\$', 'a$b', 'ab'], ['\\|', 'a|b', 'ab'], ['\\?', 'a?b', 'ab'], ['\\*', 'a*b', 'ab'], ['\\+', 'a+b', 'ab'], ['\\(', 'a(b', 'ab'],
+    ['\\)', 'a)b', 'ab'], ['\\[', 'a[b', 'ab'], ['\\]', 'a]b', 'ab'], ['[\\]\\-\\\\]', 'a]b', 'ab'],
+  ]) {
+    assert.equal(matches(pattern, withChar), true, `${pattern} on ${withChar}`);
+    assert.equal(matches(pattern, without), false, `${pattern} on ${without}`);
+  }
+  for (const pattern of ['\\<', '\\=', '\\ ', '\\/', '\\_', '\\,', '\\>', '\\!', '\\"', '\\#', '\\%', '\\&', "\\'", '\\:', '\\;', '\\@', '\\~', '\\`', 'a\\<b', '(\\=)', '[\\/]', '[\\ ]']) {
+    rejected(pattern);
+  }
+  assert.equal(matches('\\d\\w\\s\\D\\W\\S\\n\\t\\r\\f\\v', 'x'), false);
+  assert.equal(matches('\\n\\t\\r\\f\\v', 'a\n\t\r\f\u000bb'), true);
+});
+
+test('§11.4 l.612 (E-0022 D-05, AUDIT R01 F09): ^ and $ match only at the start and end of the whole text, also around a newline', () => {
+  for (const [pattern, text, expected] of [
+    ['^$', '\n', false], ['^$', 'a\n', false], ['$', '\n', true], ['$', 'a\n', true], ['^', '\n', true], ['^$', '', true], ['^\\n$', '\n', true],
+    ['^a$', 'a\n', false], ['^a', '\na', false], ['a$', 'a\nb', false], ['^b', 'a\nb', false],
+  ]) {
+    assert.equal(matches(pattern, text), expected, `${JSON.stringify(pattern)} on ${JSON.stringify(text)}`);
+  }
+});
+
+test('§11.4 l.612 (E-0022 D-05, E-0026 (2), E-0027 (1), AUDIT R01 F10): exactly 100000 instructions compiles, 100001 is not compilable', () => {
+  for (const pattern of ['(?:a{1000}){99}a{999}', '(?:a{1000}){99}a{998}', '(?:a{1000}){99}', '(?:a{1000}){98}a{1000}']) {
+    assert.equal(compileRe2(pattern).ok, true, pattern);
+  }
+  assert.equal(compileRe2('(?:a{1000}){99}a{999}').program.size, 100000, 'the final match counts as one instruction');
+  for (const pattern of ['(?:a{1000}){99}a{1000}', '(?:a{1000}){100}', '(?:a{1000}){101}', '(?:a{1000}){98}a{1000}a{1000}']) {
+    assert.equal(compileRe2(pattern).ok, false, pattern);
+  }
+  assert.equal(matches('^(?:a{100}){99}a{99}$', 'a'.repeat(9999)), true, 'a program near the cap still matches');
+});
+
+test('§11.4 l.612 (AUDIT R01 F01): zero-width nested counted repeats compile in time bounded by the instruction cap', () => {
+  const start = performance.now();
+  for (const pattern of [
+    '(?:(?:(){1000}){1000}){1000}', '(?:(?:(?:(){1000}){1000}){1000}){1000}', '(?:(?:(?:a{0}){1000}){1000}){1000}',
+    '(?:(?:(?:(?:)*){1000}){1000}){1000}', `${'('.repeat(900)}${')'.repeat(900)}{1000}`,
+  ]) {
+    const compiled = compileRe2(pattern);
+    assert.equal(typeof compiled.ok, 'boolean', pattern);
+    if (compiled.ok) assert.equal(searchRe2(compiled.program, 'abc'), true, `${pattern} matches every text`);
+  }
+  assert.ok(performance.now() - start < 2000, 'zero-width repeats must not amplify');
+});
+
+test('§11.4 l.612 (AUDIT R01 F02): a large class under counted repeats is shared between the copies, not copied per copy', () => {
+  let body = '';
+  for (let i = 0; i < 1200; i += 1) body += String.fromCodePoint(0x4e00 + 2 * i);
+  const start = performance.now();
+  const compiled = compileRe2(`(?:[${body}]{1000}){99}`);
+  assert.equal(compiled.ok, true);
+  assert.equal(compiled.program.size, 99001);
+  assert.equal(compiled.program.classes.length, 1, 'one range table for 99000 class instructions');
+  assert.ok(performance.now() - start < 2000, 'compile is independent of copies x class size');
+  const small = compileRe2(`[${body}]{3}`);
+  assert.equal(small.program.classes.length, 1);
+  assert.equal(searchRe2(small.program, '一丂丄'), true);
+  assert.equal(searchRe2(small.program, '一丁丄'), false, 'the code point between two members is not a member');
+  assert.equal(searchRe2(small.program, '一丂A'), false);
+});
+
+test('§11.4 l.612: dropping zero-width items does not change what matches', () => {
+  for (const [pattern, text, expected] of [
+    ['^(){3}a$', 'a', true], ['^(?:a{0}){5}b$', 'b', true], ['^(?:|a){2}$', 'aa', true], ['^(?:|a){2}$', 'aaa', false], ['^()*$', '', true],
+    ['^x(?:){1000}y$', 'xy', true], ['^x(?:)*y$', 'xy', true], ['^a{0}$', '', true], ['^a{0}$', 'a', false], ['^(?:a{0}b){2}$', 'bb', true],
+    ['^(a|)b$', 'b', true], ['^(a|)b$', 'ab', true], ['^(a|)b$', 'aab', false],
+  ]) {
+    assert.equal(matches(pattern, text), expected, `${pattern} on ${JSON.stringify(text)}`);
+  }
+});
+
+test('§11.4 l.612: class membership at range boundaries (many ranges, negation, class escapes)', () => {
+  const cls = '[a-cx-z0-9_.-]';
+  for (const ch of ['a', 'c', 'x', 'z', '0', '9', '_', '.', '-']) assert.equal(matches(`^${cls}$`, ch), true, ch);
+  for (const ch of ['d', 'w', '{', '`', '/', ':', 'A', ' ']) assert.equal(matches(`^${cls}$`, ch), false, ch);
+  for (const ch of ['d', 'w', ':']) assert.equal(matches('^[^a-cx-z0-9_.-]$', ch), true, ch);
+  assert.equal(matches('^[^\\d]$', '\u{1f600}'), true);
+  assert.equal(matches('^\\W$', '\u{10ffff}'), true);
+  assert.equal(matches('^\\D$', '5'), false);
 });

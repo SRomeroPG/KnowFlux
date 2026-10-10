@@ -327,9 +327,11 @@ test('§12.1 l.628 (E-0017, E-0019): decimal operands must be quoted decimal str
     both(S1(when, d), 'INVALID_DECIMAL');
   }
   for (const when of [{ concentration: { lte: { value: 4.2, unit: 'percent_mass' } } }, { concentration: { lte: { value: '4,2', unit: 'percent_mass' } } },
-    { concentration: { lte: { value: null, unit: 'percent_mass' } } }, { concentration: { lte: 4.2 } }, { concentration: { lte: 'abc' } }]) {
+    { concentration: { lte: { value: null, unit: 'percent_mass' } } }, { concentration: { lte: 4.2 } }]) {
     both(S1(when, q), 'INVALID_DECIMAL');
   }
+  // E-0025 (3), E-0027 (3): a string is a bare scalar against a quantity input: KF-E-310, not INVALID_DECIMAL
+  assert.deepEqual(pairs(check(S1({ concentration: { lte: 'abc' } }, q))), [['KF-E-310', '/rules/0/when/concentration/lte']]);
   assert.equal(checkCode(S1({ concentration: { lte: { value: '4.2' } } }, q)), 'INVALID_TABLE', 'a mapping without unit is not a quantity');
 });
 
@@ -483,7 +485,10 @@ test('§11.1 l.583 (E-0017): supplied values must be decimal strings and well-ty
   assert.equal(runCode(tq, { [TQ]: { value: 4.2, unit: 'percent_mass' } }), 'INVALID_DECIMAL');
   assert.equal(runCode(tq, { [TQ]: { value: '4,2', unit: 'percent_mass' } }), 'INVALID_DECIMAL');
   assert.equal(runCode(tq, { [TQ]: 4.2 }), 'INVALID_DECIMAL');
-  assert.equal(runCode(tq, { [TQ]: true }), 'TYPE_MISMATCH');
+  // E-0025 (3): a boolean supplied for a quantity input is a bare scalar: KF-E-310 (was TYPE_MISMATCH before R01)
+  const asBool = run(tq, { [TQ]: true });
+  assert.deepEqual([asBool.status, asBool.diagnostics.map((d) => [d.code, d.expected_unit, d.found_unit])], ['error', [['KF-E-310', 'percent_mass', null]]]);
+  assert.equal(runCode(tq, { [TQ]: [] }), 'TYPE_MISMATCH');
   assert.equal(runCode(tq, { [TQ]: { value: '1' } }), 'TYPE_MISMATCH');
   const ts = S1({ note: { matches: 'a' } }, ins('s'));
   assert.equal(runCode(ts, { 'DE-1.note': 5 }), 'TYPE_MISMATCH');
@@ -503,7 +508,8 @@ test('§12.1 l.623 (E-0019): lt lte gt gte between apply only to decimal and qua
   both(S1({ note: 5 }, ins('s')), 'TYPE_MISMATCH');
   both(S1({ flag: 'true' }, ins('b')), 'TYPE_MISMATCH');
   both(S1({ material: 5 }, ins('e')), 'TYPE_MISMATCH');
-  both(S1({ note: Q('1') }, ins('s')), 'TYPE_MISMATCH');
+  // E-0025 (3): a quantity literal on a string input is KF-E-310 (was TYPE_MISMATCH before R01)
+  assert.deepEqual(pairs(check(S1({ note: Q('1') }, ins('s')))), [['KF-E-310', '/rules/0/when/note']]);
 });
 
 test('§12.1 l.632 (E-0021): input declarations are validated (types, units, duplicates, domains)', () => {
@@ -732,7 +738,11 @@ test('§12.1 l.633 (E-0020): all-enum tables within the limit are checked by exa
   assert.deepEqual(check(pairTable(A, { a: { ne: 'X' } }, { a: 'X' })), [], 'enumeration is exact where set reasoning is not');
   diags = check(pairTable(A, { a: { ne: 'X' } }, { a: 'Y' }));
   assert.deepEqual([diags[0].proof, diags[0].witness], ['enumeration', { 'DE-1.a': 'Y' }]);
-  assert.deepEqual(check(pairTable(A, { a: { ne: 'X' } }, { a: 'X' }), { ...OPTS, proofLimit: 2 }), [], 'product 2 <= limit 2');
+  // E-0025 (1): enumeration needs the product of the sizes (2) and of the sizes plus one (3) within the limit.
+  // Restated: before R01 this asserted [] for proofLimit 2.
+  assert.deepEqual(check(pairTable(A, { a: { ne: 'X' } }, { a: 'X' }), { ...OPTS, proofLimit: 3 }), [], 'products 2 and 3 <= limit 3');
+  diags = check(pairTable(A, { a: { ne: 'X' } }, { a: 'X' }), { ...OPTS, proofLimit: 2 });
+  assert.deepEqual(o312(diags), [['KF-E-312', 'not_proven_disjoint', 'r1+r2']], 'product 2 <= 2 but 3 > 2: falls back, ne is not provable');
   diags = check(pairTable(A, { a: { ne: 'X' } }, { a: 'X' }), { ...OPTS, proofLimit: 1 });
   assert.deepEqual(o312(diags), [['KF-E-312', 'not_proven_disjoint', 'r1+r2']], 'over the limit: ne cannot be proven disjoint');
   assert.deepEqual(check(pairTable(A, { a: 'X' }, { a: 'Y' }), { ...OPTS, proofLimit: 1 }), []);
@@ -1044,4 +1054,181 @@ test('§53 l.2037 item 9 (V-39): the engine modules import only engine siblings 
   for (const word of ['Number(', 'parseInt', 'Math.']) assert.equal(decimal.includes(word), false, `decimal.mjs contains ${word}`);
   const dt = strip(await fs.readFile(path.join(dir, 'decision-table.mjs'), 'utf8'));
   assert.equal(/Math\./.test(dt), false, 'no Math in the evaluator');
+});
+
+// ================================================================================================ R01 remediation
+const AXY = { ref: 'DE-1.a', type: 'enum', domain: ['X', 'Y'] };
+const BPQ = { ref: 'DE-1.b', type: 'enum', domain: ['P', 'Q'] };
+
+test('§12.1 l.633 (E-0025 (1), AUDIT R01 F03): unique enumerates every domain value and then null; the witness may contain null', () => {
+  const t = pairTable([AXY], { not: { a: 'X' } }, { a: { is_null: true } });
+  const diags = check(t);
+  assert.deepEqual(o312(diags), [['KF-E-312', 'enumeration', 'r1+r2']]);
+  assert.deepEqual(diags[0].witness, { 'DE-1.a': null });
+  // the evaluation of the same table with the input absent reports the overlap the check announced
+  const res = run(t, {});
+  assert.equal(res.status, 'error');
+  assert.deepEqual(res.diagnostics.map((d) => [d.code, d.proof, d.rules]), [['KF-E-312', 'evaluation', ['r1', 'r2']]]);
+  assert.equal(run(t, { 'DE-1.a': 'Y' }).result.rule, 'r1');
+  // D-06 order with null last: first input outermost, last input fastest
+  const AB = [AXY, BPQ];
+  let out = check(pairTable(AB, { not: { a: 'X' } }, { all: [{ a: { is_null: true } }, { b: 'P' }] }));
+  assert.deepEqual(out[0].witness, { 'DE-1.a': null, 'DE-1.b': 'P' });
+  out = check(pairTable(AB, { not: { b: 'P' } }, { all: [{ a: 'X' }, { b: { is_null: true } }] }));
+  assert.deepEqual(out[0].witness, { 'DE-1.a': 'X', 'DE-1.b': null });
+  out = check(pairTable(AB, { not: { a: 'X' } }, { b: { is_null: true } }));
+  assert.deepEqual(out[0].witness, { 'DE-1.a': 'Y', 'DE-1.b': null });
+  assert.deepEqual(Object.keys(out[0].witness), ['DE-1.a', 'DE-1.b']);
+});
+
+test('§12.1 l.633 (E-0025 (1), l.607): near-misses with an absent input stay clean; beyond the limit the proof fails closed', () => {
+  for (const [w1, w2] of [
+    [{ a: 'Y' }, { a: { is_null: true } }], [{ a: { ne: 'X' } }, { a: { is_null: true } }], [{ not: { a: 'X' } }, { a: 'X' }],
+    [{ not: { a: { is_null: true } } }, { a: { is_null: true } }], [{ a: { is_null: false } }, { a: { is_null: true } }],
+  ]) {
+    assert.deepEqual(check(pairTable([AXY], w1, w2)), [], JSON.stringify([w1, w2]));
+  }
+  const names = (n) => Array.from({ length: n }, (_, i) => `v${String(i).padStart(3, '0')}`);
+  const big = (n) => pairTable([{ ref: 'DE-1.a', type: 'enum', domain: names(n) }], { not: { a: 'v000' } }, { a: { is_null: true } });
+  const at255 = check(big(255));
+  assert.deepEqual([o312(at255), at255[0].witness], [[['KF-E-312', 'enumeration', 'r1+r2']], { 'DE-1.a': null }], '256 <= 256');
+  assert.deepEqual(o312(check(big(256))), [['KF-E-312', 'not_proven_disjoint', 'r1+r2']], '257 > 256: falls back and fails closed');
+  // two inputs: both products must be within the limit
+  const two = (n, m) => pairTable([{ ref: 'DE-1.a', type: 'enum', domain: names(n) }, { ref: 'DE-1.b', type: 'enum', domain: names(m) }], { a: { ne: 'v000' } }, { a: 'v000' });
+  assert.deepEqual(check(two(15, 15)), [], '225 and 16 x 16 = 256');
+  assert.deepEqual(o312(check(two(15, 16))), [['KF-E-312', 'not_proven_disjoint', 'r1+r2']], '240 <= 256 but 16 x 17 = 272');
+});
+
+test('§12.1 l.634 (E-0025 (2), AUDIT R01 F03): coverage is proven over the domains only; an exhaustive enum table evaluates an absent input to no match', () => {
+  const rows = [['r1', { material: { not_in: ['X'] } }], ['r2', { material: 'X' }]];
+  const t = exhaustiveTable(rows, ins('e'));
+  assert.deepEqual(check(t), []);
+  for (const values of [{}, { 'DE-1.material': null }]) {
+    const res = run(t, values);
+    assert.deepEqual([res.status, res.result, res.via_default, res.diagnostics], ['ok', null, false, []]);
+  }
+  assert.equal(run(t, { 'DE-1.material': 'Y' }).result.rule, 'r1');
+  const collect = run({ ...t, hit_policy: 'collect' }, {});
+  assert.deepEqual([collect.status, collect.result], ['ok', []]);
+});
+
+test('§11.2 l.589 (E-0019, E-0025 (3), E-0027 (3), AUDIT R01 F04): a quantity against a non-quantity is KF-E-310 in both directions', () => {
+  const detail = (diags) => diags.map((d) => [d.code, d.pointer, d.input, d.expected_unit, d.found_unit, d.source]);
+  const quantity = Q('1');
+  for (const [name, when, pointer] of [
+    ['e', { material: quantity }, '/rules/0/when/material'], ['e', { material: { eq: quantity } }, '/rules/0/when/material/eq'],
+    ['e', { material: { in: ['X', quantity] } }, '/rules/0/when/material/in/1'], ['s', { note: quantity }, '/rules/0/when/note'],
+    ['s', { note: { ne: quantity } }, '/rules/0/when/note/ne'], ['s', { note: { not_in: ['a', quantity] } }, '/rules/0/when/note/not_in/1'],
+    ['b', { flag: quantity }, '/rules/0/when/flag'], ['b', { flag: { eq: quantity } }, '/rules/0/when/flag/eq'],
+  ]) {
+    const input = ins(name);
+    const diags = check(S1(when, input));
+    assert.deepEqual(detail(diags), [['KF-E-310', pointer, input[0].ref, null, 'percent_mass', 'literal']], JSON.stringify(when));
+    const res = run(S1(when, input), {});
+    assert.deepEqual([res.status, res.result, res.diagnostics.map((d) => d.code)], ['error', null, ['KF-E-310']], 'a table with a static finding is not evaluated');
+  }
+  assert.equal(checkCode(S1({ material: Q('1', 'furlong') }, ins('e'))), 'UNKNOWN_UNIT', 'the literal unit must be declared');
+  assert.equal(checkCode(S1({ material: Q('x') }, ins('e'))), 'INVALID_DECIMAL');
+  // supplied: a bare scalar for a quantity input
+  const tq = S1({ concentration: { lte: Q('4.2') } }, ins('q'));
+  for (const supplied of ['abc', 'X', 'true', true, false, '4.2']) {
+    const res = run(tq, { [TQ]: supplied });
+    assert.deepEqual([res.status, res.result, detail(res.diagnostics)], ['error', null, [['KF-E-310', '/inputs/0', TQ, 'percent_mass', null, 'value']]], String(supplied));
+  }
+  assert.equal(run(tq, { [TQ]: Q('4.2') }).result.rule, 'r1');
+  assert.equal(run(tq, { [TQ]: null }).result.rule, 'r2');
+  assert.equal(run(tq, {}).result.rule, 'r2');
+  assert.equal(runCode(tq, { [TQ]: 4.2 }), 'INVALID_DECIMAL', 'a JS number is not a decimal string');
+  // supplied: a quantity for an enum, string, boolean (and decimal) input
+  for (const [name, when, good] of [['e', { material: 'X' }, 'X'], ['s', { note: 'a' }, 'a'], ['b', { flag: true }, true], ['d', { count: '1' }, '1']]) {
+    const input = ins(name);
+    const t = S1(when, input);
+    const res = run(t, { [input[0].ref]: Q('1', 'ppm_mass') });
+    assert.deepEqual([res.status, res.result, detail(res.diagnostics)], ['error', null, [['KF-E-310', '/inputs/0', input[0].ref, null, 'ppm_mass', 'value']]], name);
+    assert.equal(run(t, { [input[0].ref]: good }).result.rule, 'r1', name);
+  }
+  // near-misses on the static side
+  assert.deepEqual(check(S1({ concentration: Q('1') }, ins('q'))), []);
+  assert.deepEqual(check(S1({ material: { in: ['X', 'Y'] } }, ins('e'))), []);
+});
+
+test('§12.1 l.620 (E-0019, E-0022 D-02, E-0027 (2), AUDIT R01 F05): a key that is one ref and another suffix is AMBIGUOUS_FIELD', () => {
+  const xs = () => [{ ref: 'x', type: 'decimal' }, { ref: 'A.x', type: 'decimal' }];
+  both(S1({ x: '1' }, xs()), 'AMBIGUOUS_FIELD');
+  both(S1({ not: { x: '1' } }, xs()), 'AMBIGUOUS_FIELD');
+  both(S1({ any: [{ 'A.x': '1' }, { x: '1' }] }, xs()), 'AMBIGUOUS_FIELD');
+  const t = S1({ 'A.x': '1' }, xs());
+  assert.deepEqual(check(t), []);
+  assert.equal(run(t, { 'A.x': '1' }).result.rule, 'r1');
+  assert.equal(run(t, { 'A.x': '2' }).result.rule, 'r2');
+  // supplied keys bind by the same rule
+  assert.equal(runCode(t, { x: '1' }), 'AMBIGUOUS_FIELD');
+  assert.equal(runCode(t, { 'A.x': '1', x: '1' }), 'AMBIGUOUS_FIELD');
+  // near-miss: the key is the full ref of one input and the suffix of no other
+  const solo = S1({ x: '1' }, [{ ref: 'x', type: 'decimal' }, { ref: 'B.y', type: 'decimal' }]);
+  assert.equal(run(solo, { x: '1', y: '5' }).result.rule, 'r1');
+  assert.equal(run(solo, { x: '2' }).result.rule, 'r2');
+  assert.equal(checkCode(S1({ nothing: '1' }, xs())), 'UNBOUND_FIELD');
+});
+
+test('§12.1 l.633 (E-0020 (b), AUDIT R01 F07): a value set against a closed or open bound, in both orders', () => {
+  const overlapping = [
+    [{ count: '5' }, { count: { gte: '5' } }], [{ count: '5' }, { count: { lte: '5' } }],
+    [{ count: { in: ['1', '5'] } }, { count: { between: ['5', '9'] } }], [{ count: { in: ['1', '2'] } }, { count: { gte: '2.0' } }],
+  ];
+  const disjoint = [[{ count: { in: ['1', '5'] } }, { count: { gt: '5' } }], [{ count: { in: ['1', '5'] } }, { count: { lt: '1' } }]];
+  for (const [w1, w2] of overlapping) {
+    for (const [a, b] of [[w1, w2], [w2, w1]]) assert.deepEqual(o312(check(pairTable(NON_ENUM, a, b))), [['KF-E-312', 'not_proven_disjoint', 'r1+r2']], JSON.stringify([a, b]));
+  }
+  for (const [w1, w2] of disjoint) {
+    for (const [a, b] of [[w1, w2], [w2, w1]]) assert.deepEqual(check(pairTable(NON_ENUM, a, b)), [], JSON.stringify([a, b]));
+  }
+});
+
+test('§36 l.1600 (PLAN sort key, AUDIT R01 F08): evaluation diagnostics are sorted by code and then by pointer in byte order', () => {
+  const t = S1({ material: 'X' }, [{ ref: 'DE-1.material', type: 'enum', domain: ['X'] }, { ...IN.q }]);
+  const mixed = run(t, { 'DE-1.material': 'W', [TQ]: Q('1', 'ppm_mass') });
+  assert.deepEqual(mixed.diagnostics.map((d) => [d.code, d.pointer]), [['KF-E-310', '/inputs/1'], ['KF-E-314', '/inputs/0']]);
+  const many = Array.from({ length: 11 }, (_, i) => ({ ref: `DE-1.i${i}`, type: 'enum', domain: ['X'] }));
+  const wide = S1({ i0: 'X' }, many);
+  assert.deepEqual(run(wide, { 'DE-1.i2': 'W', 'DE-1.i10': 'W' }).diagnostics.map((d) => d.pointer), ['/inputs/10', '/inputs/2']);
+  assert.deepEqual(run(wide, { 'DE-1.i9': 'W', 'DE-1.i1': 'W', 'DE-1.i10': 'W' }).diagnostics.map((d) => d.pointer), ['/inputs/1', '/inputs/10', '/inputs/9']);
+});
+
+test('§12.1 l.623 (E-0019, AUDIT R01 F11): strings and enum values compare by code point, without Unicode normalization', () => {
+  const composed = 'é';
+  const decomposed = 'é';
+  const row = (when, supplied) => run(S1(when, ins('s')), { 'DE-1.note': supplied }).result.rule;
+  assert.equal(row({ note: composed }, decomposed), 'r2');
+  assert.equal(row({ note: composed }, composed), 'r1');
+  assert.equal(row({ note: decomposed }, composed), 'r2');
+  assert.equal(row({ note: { ne: composed } }, decomposed), 'r1');
+  assert.equal(row({ note: { in: [composed] } }, decomposed), 'r2');
+  assert.equal(row({ note: { not_in: [composed] } }, decomposed), 'r1');
+  assert.equal(row({ note: 'abc' }, 'ABC'), 'r2');
+});
+
+test('§11.3 l.607 (E-0026 (1), AUDIT R01 F11): literal null operands in ne, in and not_in', () => {
+  const rowOf = (name, when, supplied) => {
+    const input = ins(name);
+    const t = S1(when, input);
+    assert.deepEqual(check(t), []);
+    return run(t, supplied === undefined ? {} : { [input[0].ref]: supplied }).result.rule;
+  };
+  assert.equal(rowOf('s', { note: { ne: null } }, 'x'), 'r2', 'ne null is false for a non-null input');
+  assert.equal(rowOf('s', { not: { note: { ne: null } } }, 'x'), 'r1');
+  assert.equal(rowOf('s', { note: { in: ['x', null] } }, 'x'), 'r1');
+  assert.equal(rowOf('s', { note: { in: ['x', null] } }, 'y'), 'r2');
+  assert.equal(rowOf('s', { note: { in: ['x', null] } }, undefined), 'r2', 'a null element never matches an absent input');
+  assert.equal(rowOf('s', { note: { in: [null] } }, 'x'), 'r2');
+  assert.equal(rowOf('s', { note: { not_in: ['y', null] } }, 'x'), 'r2', 'a null element makes not_in false');
+  assert.equal(rowOf('s', { note: { not_in: ['y', null] } }, 'y'), 'r2');
+  assert.equal(rowOf('s', { note: { not_in: [null] } }, 'x'), 'r2');
+  assert.equal(rowOf('s', { note: { not_in: ['y'] } }, 'x'), 'r1', 'near-miss: no null element');
+  assert.equal(rowOf('s', { note: { not_in: ['y'] } }, 'y'), 'r2');
+  assert.equal(rowOf('s', { note: { not_in: ['y'] } }, undefined), 'r2');
+  assert.equal(rowOf('d', { count: { not_in: ['2', null] } }, '1'), 'r2');
+  assert.equal(rowOf('d', { count: { in: ['1', null] } }, '1.0'), 'r1');
+  assert.equal(rowOf('e', { material: { not_in: ['Y', null] } }, 'X'), 'r2');
+  assert.equal(rowOf('e', { material: { in: ['X', null] } }, 'X'), 'r1');
 });

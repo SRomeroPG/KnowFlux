@@ -130,18 +130,25 @@ function declareInput(raw, index, registry, seen) {
   return input;
 }
 
-/** Bind a `when` key or a supplied key to an input index: full ref first, then the suffix after the last dot. */
+/**
+ * Bind a `when` key or a supplied key to an input index (E-0019, E-0022 D-02, E-0027 (2)). An input is a candidate
+ * when its full `ref` equals the key or the part of its `ref` after the last dot equals the key. No candidate is
+ * UNBOUND_FIELD; two candidates are AMBIGUOUS_FIELD, even when the key is the full ref of one of them (inputs `x`
+ * and `A.x`: the key `x` is ambiguous, the key `A.x` binds by full ref).
+ */
 function makeBinder(inputs) {
-  const byRef = new Map();
-  const bySuffix = new Map();
+  const byKey = new Map();
+  const add = (key, index) => {
+    if (!byKey.has(key)) byKey.set(key, []);
+    const list = byKey.get(key);
+    if (!list.includes(index)) list.push(index);
+  };
   for (const input of inputs) {
-    byRef.set(input.ref, input.index);
-    if (!bySuffix.has(input.suffix)) bySuffix.set(input.suffix, []);
-    bySuffix.get(input.suffix).push(input.index);
+    add(input.ref, input.index);
+    add(input.suffix, input.index);
   }
   return (key, pointer) => {
-    if (byRef.has(key)) return byRef.get(key);
-    const candidates = bySuffix.get(key) ?? [];
+    const candidates = byKey.get(key) ?? [];
     if (candidates.length === 0) throw err('UNBOUND_FIELD', `"${key}" matches no input`, { key, at: pointer });
     if (candidates.length > 1) {
       throw err('AMBIGUOUS_FIELD', `"${key}" matches several inputs; use the full ref`, { key, at: pointer, inputs: candidates.map((i) => inputs[i].ref) });
@@ -184,15 +191,15 @@ function readOperand(ctx, input, value, pointer, { allowNull }) {
     if (allowNull) return { kind: 'null' };
     throw err('INVALID_DECIMAL', 'null is not a valid operand here', { at: pointer });
   }
+  // E-0025 (3), E-0027 (3): a quantity literal against any input that is not a quantity is exactly one KF-E-310
+  // (the non-quantity side has no unit); domain membership (KF-E-314) applies to scalar values only.
+  if (input.type !== 'quantity' && isQuantityShape(value)) {
+    validateQuantityLiteral(ctx, value, pointer);
+    finding310(ctx, input, pointer, value.unit);
+    return { kind: 'bad' };
+  }
   switch (input.type) {
-    case 'decimal': {
-      if (isQuantityShape(value)) {
-        validateQuantityLiteral(ctx, value, pointer);
-        finding310(ctx, input, pointer, value.unit);
-        return { kind: 'bad' };
-      }
-      return { kind: 'dec', dec: parseDecimal(value) };
-    }
+    case 'decimal': return { kind: 'dec', dec: parseDecimal(value) };
     case 'quantity': {
       if (isQuantityShape(value)) {
         const dec = validateQuantityLiteral(ctx, value, pointer);
@@ -203,7 +210,8 @@ function readOperand(ctx, input, value, pointer, { allowNull }) {
         return { kind: 'qty', dec };
       }
       if (isRecord(value) || Array.isArray(value)) throw err('INVALID_TABLE', 'a quantity operand needs exactly `value` and `unit`', { at: pointer });
-      parseDecimal(value);
+      // E-0025 (3): a string or boolean literal is a bare scalar against a quantity input; other types are not decimals.
+      if (typeof value !== 'string' && typeof value !== 'boolean') parseDecimal(value);
       finding310(ctx, input, pointer, null);
       return { kind: 'bad' };
     }
@@ -428,7 +436,8 @@ function evaluateComparison(node, values) {
     case 'eq': return equalsOperand(value, node.operand);
     case 'ne': return node.operand.kind !== 'null' && node.operand.kind !== 'bad' && !equalsOperand(value, node.operand);
     case 'in': return node.operands.some((operand) => equalsOperand(value, operand));
-    case 'not_in': return !node.operands.some((operand) => equalsOperand(value, operand));
+    // E-0026 (1): a null element never matches `in`, and makes `not_in` false (element-wise `ne` is false on null)
+    case 'not_in': return node.operands.every((operand) => operand.kind !== 'null' && operand.kind !== 'bad' && !equalsOperand(value, operand));
     case 'lt': return orderable(node.operand) && compareDecimal(value.dec, node.operand.dec) < 0;
     case 'lte': return orderable(node.operand) && compareDecimal(value.dec, node.operand.dec) <= 0;
     case 'gt': return orderable(node.operand) && compareDecimal(value.dec, node.operand.dec) > 0;
@@ -459,6 +468,12 @@ function typeSupplied(input, raw, diagnostics) {
       source: 'value',
     },
   ));
+  if (input.type !== 'quantity' && isQuantityShape(raw)) {
+    // E-0025 (3): a quantity supplied for a decimal, enum, string or boolean input; the declared side has no unit.
+    parseDecimal(raw.value);
+    unitFinding(typeof raw.unit === 'string' ? raw.unit : null);
+    return null;
+  }
   switch (input.type) {
     case 'quantity': {
       if (isQuantityShape(raw)) {
@@ -470,22 +485,15 @@ function typeSupplied(input, raw, diagnostics) {
         }
         return { kind: 'qty', dec };
       }
-      if (typeof raw === 'string') {
-        parseDecimal(raw);
+      // E-0025 (3): any non-quantity scalar (decimal string, string, enum value, boolean) is a bare scalar.
+      if (typeof raw === 'string' || typeof raw === 'boolean') {
         unitFinding(null);
         return null;
       }
       if (typeof raw === 'number' || typeof raw === 'bigint') parseDecimal(raw);
       throw err('TYPE_MISMATCH', 'a quantity input needs a quantity {value, unit}', { at, input: input.ref, found: typeName(raw) });
     }
-    case 'decimal': {
-      if (isQuantityShape(raw)) {
-        parseDecimal(raw.value);
-        unitFinding(typeof raw.unit === 'string' ? raw.unit : null);
-        return null;
-      }
-      return { kind: 'dec', dec: parseDecimal(raw) };
-    }
+    case 'decimal': return { kind: 'dec', dec: parseDecimal(raw) };
     case 'enum': {
       if (typeof raw !== 'string') throw err('TYPE_MISMATCH', 'an enum input needs a string', { at, input: input.ref, found: typeName(raw) });
       if (input.domainSet !== null && !input.domainSet.has(raw)) {
@@ -571,15 +579,23 @@ function enumerableDomains(table) {
   return domains;
 }
 
-function productOf(domains) {
+/** Product of the domain sizes, each plus `extra` (1 = the absent value, E-0025 (1)). */
+function productOf(domains, extra = 0) {
   let product = 1n;
-  for (const domain of domains) product *= BigInt(domain.length);
+  for (const domain of domains) product *= BigInt(domain.length + extra);
   return product;
 }
 
-/** First input outermost, last input fastest, values in domain order (E-0022 D-06). */
-function forEachTuple(domains, visit) {
-  const typed = domains.map((domain) => domain.map((value) => ({ kind: 'str', value })));
+/**
+ * First input outermost, last input fastest, values in domain order (E-0022 D-06). With `withAbsent`, each input
+ * ranges over its domain values and then `null` (absent, last; E-0025 (1)).
+ */
+function forEachTuple(domains, visit, withAbsent = false) {
+  const typed = domains.map((domain) => {
+    const values = domain.map((value) => ({ kind: 'str', value }));
+    if (withAbsent) values.push(null);
+    return values;
+  });
   const count = domains.length;
   const index = new Array(count).fill(0);
   const tuple = new Array(count);
@@ -598,7 +614,7 @@ function forEachTuple(domains, visit) {
 }
 
 function witnessOf(table, index) {
-  return record(table.inputs.map((input, k) => [input.ref, input.domain[index[k]]]));
+  return record(table.inputs.map((input, k) => [input.ref, index[k] < input.domain.length ? input.domain[index[k]] : null]));
 }
 
 function checkExhaustive(table, limit) {
@@ -724,7 +740,8 @@ function checkOverlap(table, limit) {
   const rows = table.rules.filter((rule) => !rule.isDefault);
   if (rows.length < 2) return [];
   const domains = enumerableDomains(table);
-  if (domains !== null && productOf(domains) <= BigInt(limit)) {
+  // E-0025 (1): enumerate (domain values plus null) only when both products are within the limit.
+  if (domains !== null && productOf(domains) <= BigInt(limit) && productOf(domains, 1) <= BigInt(limit)) {
     let found = null;
     forEachTuple(domains, (tuple, index) => {
       const hits = [];
@@ -737,7 +754,7 @@ function checkOverlap(table, limit) {
       if (hits.length < 2) return false;
       found = { hits, witness: witnessOf(table, index) };
       return true;
-    });
+    }, true);
     if (found === null) return [];
     const [first, second] = found.hits;
     return [makeDiagnostic('KF-E-312', `rules ${first.id} and ${second.id} both match the same input combination`, {

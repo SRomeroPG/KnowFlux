@@ -6,8 +6,9 @@
 // compile and match are bounded for any input. No recursion depth depends on the length of the text.
 //
 // Accepted syntax (everything else, and every syntax error, is `{ ok: false }`):
-//   literals; escaped ASCII punctuation (\. \( \\ ...); \n \t \r \f \v; `.` (any code point except \n);
-//   classes [...] with ranges and negation, containing literals, escaped punctuation, \n \t \r \f \v and
+//   literals; escaped metacharacters (\\ \^ \$ \. \| \? \* \+ \( \) \[ \] \{ \} and \-); \n \t \r \f \v;
+//   `.` (any code point except \n);
+//   classes [...] with ranges and negation, containing literals, escaped metacharacters, \n \t \r \f \v and
 //   \d \w \s \D \W \S; \d \w \s \D \W \S outside classes (ASCII definitions);
 //   anchors ^ and $ (start and end of the WHOLE text only); groups ( ) and (?: ); alternation |;
 //   quantifiers * + ? {n} {n,} {n,m} with n, m <= 1000, each optionally followed by one lazy `?`.
@@ -85,12 +86,11 @@ function controlEscape(letter) {
   }
 }
 
-function isAsciiPunctuationEscape(code) {
-  if (code >= 0x80) return false;
-  if (code >= 48 && code <= 57) return false;
-  if (code >= 65 && code <= 90) return false;
-  if (code >= 97 && code <= 122) return false;
-  return code !== 95;
+// E-0022 D-05: the only escaped punctuation accepted is the metacharacters of the accepted syntax and `-`.
+const ESCAPABLE_METACHARACTERS = new Set([92, 94, 36, 46, 124, 63, 42, 43, 40, 41, 91, 93, 123, 125, 45]);
+
+function isMetacharacterEscape(code) {
+  return ESCAPABLE_METACHARACTERS.has(code);
 }
 
 // ------------------------------------------------------------------------------------------------ parser
@@ -181,7 +181,7 @@ function parsePattern(cps) {
     if (set !== null) return { ranges: set };
     const control = controlEscape(letter);
     if (control !== null) return { cp: control };
-    if (isAsciiPunctuationEscape(letter)) return { cp: letter };
+    if (isMetacharacterEscape(letter)) return { cp: letter };
     throw fail(inClass ? 'unsupported escape inside a character class' : 'unsupported escape sequence');
   }
 
@@ -271,32 +271,61 @@ function parsePattern(cps) {
   return root;
 }
 
-// ----------------------------------------------------------------------------------------- program size
+// ------------------------------------------------------------------------------- program size and shape
+// One pass over the AST, before anything is emitted. It (1) computes, for every node, the number of instructions
+// the emitter will produce (clamped at MAX_PROGRAM_SIZE + 1), memoized in `node.size`; (2) replaces every node
+// that would emit no instruction (an empty group, a repeat of such a node, a repeat with max 0) by the shared
+// EMPTY node and drops empty items from concatenations, so that emission work is always proportional to the
+// instructions emitted and never to the product of nested repeat counts (zero-width amplification, AUDIT R01 F01);
+// and (3) builds one range table per class node, shared by every copy of that node (AUDIT R01 F02).
+const EMPTY = Object.freeze({ t: 'empty', size: 0 });
+
 function clamp(value) {
   return value > MAX_PROGRAM_SIZE + 1 ? MAX_PROGRAM_SIZE + 1 : value;
 }
 
-function sizeOf(node) {
+function shape(node) {
   switch (node.t) {
-    case 'empty': return 0;
+    case 'empty': return EMPTY;
     case 'cat': {
+      const items = [];
       let total = 0;
-      for (const item of node.items) total = clamp(total + sizeOf(item));
-      return total;
+      for (const raw of node.items) {
+        const item = shape(raw);
+        if (item.size === 0) continue;
+        items.push(item);
+        total = clamp(total + item.size);
+      }
+      if (items.length === 0) return EMPTY;
+      if (items.length === 1) return items[0];
+      node.items = items;
+      node.size = total;
+      return node;
     }
     case 'alt': {
       let total = 2 * (node.items.length - 1);
-      for (const item of node.items) total = clamp(total + sizeOf(item));
-      return total;
+      node.items = node.items.map((raw) => shape(raw));
+      for (const item of node.items) total = clamp(total + item.size);
+      node.size = total;
+      return node;
     }
     case 'rep': {
-      const s = sizeOf(node.item);
+      const item = shape(node.item);
       const { min, max } = node;
-      if (max === -1) return min === 0 ? clamp(s + 2) : clamp(min * s + 1);
-      if (max === 0) return 0;
-      return clamp(min * s + (max - min) * (s + 1));
+      if (item.size === 0 || max === 0) return EMPTY;
+      node.item = item;
+      const s = item.size;
+      if (max === -1) node.size = min === 0 ? clamp(s + 2) : clamp(min * s + 1);
+      else node.size = clamp(min * s + (max - min) * (s + 1));
+      return node;
     }
-    default: return 1;
+    case 'class':
+      node.table = Int32Array.from(node.ranges.flat());
+      node.size = 1;
+      return node;
+    default:
+      node.size = 1;
+      return node;
   }
 }
 
@@ -315,6 +344,7 @@ function emitProgram(root, total) {
   const xs = new Int32Array(total);
   const ys = new Int32Array(total);
   const classes = [];
+  const classIndex = new Map();
   let pc = 0;
 
   function push(op, x = 0, y = 0) {
@@ -331,8 +361,13 @@ function emitProgram(root, total) {
       case 'char': push(OP_CHAR, node.cp); return;
       case 'any': push(OP_ANY); return;
       case 'class': {
-        classes.push(Int32Array.from(node.ranges.flat()));
-        push(OP_CLASS, classes.length - 1);
+        let index = classIndex.get(node);
+        if (index === undefined) {
+          index = classes.length;
+          classes.push(node.table);
+          classIndex.set(node, index);
+        }
+        push(OP_CLASS, index);
         return;
       }
       case 'bol': push(OP_BOL); return;
@@ -401,8 +436,8 @@ export function compileRe2(pattern) {
   const cps = [];
   for (const ch of pattern) cps.push(ch.codePointAt(0));
   try {
-    const root = parsePattern(cps);
-    const total = sizeOf(root) + 1;
+    const root = shape(parsePattern(cps));
+    const total = root.size + 1;
     if (total > MAX_PROGRAM_SIZE) throw fail(`compiled program exceeds ${MAX_PROGRAM_SIZE} instructions`);
     const program = emitProgram(root, total);
     BRAND.add(program);
@@ -436,10 +471,15 @@ class SparseSet {
   }
 }
 
+/** `ranges` is a sorted, merged, flat [lo, hi, lo, hi, ...] table: binary search by range. */
 function inClass(ranges, code) {
-  for (let i = 0; i < ranges.length; i += 2) {
-    if (code < ranges[i]) return false;
-    if (code <= ranges[i + 1]) return true;
+  let low = 0;
+  let high = ranges.length / 2 - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (code < ranges[2 * mid]) high = mid - 1;
+    else if (code > ranges[2 * mid + 1]) low = mid + 1;
+    else return true;
   }
   return false;
 }
