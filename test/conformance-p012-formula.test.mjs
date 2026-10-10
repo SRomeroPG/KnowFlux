@@ -749,6 +749,12 @@ const holes = (length, fill = {}) => {
   return list;
 };
 const SPARSE_X = { loss_factor: { eq: '1' } };
+/** `levels` nested wrappers ('not' => {not: p}; 'all' => {all: [p]}) around the predicate. */
+const wrapDeep = (levels, kind, predicate) => {
+  let node = predicate;
+  for (let i = 0; i < levels; i += 1) node = kind === 'not' ? { not: node } : { all: [node] };
+  return node;
+};
 const sparseGuard = (when) => ({ ...FX(rf), guards: [{ when, raise: 'OUT-0001' }] });
 const sparseCond = (cond) => FX(iff(cond, rf, ref('g')));
 const SPARSE_SHAPES = [
@@ -759,8 +765,19 @@ const SPARSE_SHAPES = [
   ['{any: [x, hole, x]}', () => ({ any: holes(3, { 0: SPARSE_X, 2: SPARSE_X }) })],
   ['{all: [{any: new Array(2)}]}', () => ({ all: [{ any: holes(2) }] })],
   ['{not: {all: [hole, x]}}', () => ({ not: { all: holes(2, { 1: SPARSE_X }) } })],
+  // audit R02 T01: the hole sits deep inside nested combinators (E-0033 "malformed node"; depth limit 1000 not reached)
+  ['8 x not around {all: [hole, x]}', () => wrapDeep(8, 'not', { all: holes(2, { 1: SPARSE_X }) })],
+  ['8 x all around {all: [hole, x]}', () => wrapDeep(8, 'all', { all: holes(2, { 1: SPARSE_X }) })],
+  ['8 x not around {any: new Array(2)}', () => wrapDeep(8, 'not', { any: holes(2) })],
+  ['900 x not around {all: [hole, x]}', () => wrapDeep(900, 'not', { all: holes(2, { 1: SPARSE_X }) })],
+  ['900 x all around {all: [hole, x]}', () => wrapDeep(900, 'all', { all: holes(2, { 1: SPARSE_X }) })],
+  // audit R02 T02: a multi-key predicate mapping with the hole in the non-first key, both key orders
+  ['{x, all: [hole, x]} (hole key second)', () => ({ ...SPARSE_X, all: holes(2, { 1: SPARSE_X }) })],
+  ['{all: [hole, x], x} (hole key first)', () => ({ all: holes(2, { 1: SPARSE_X }), ...SPARSE_X })],
+  ['{x, any: new Array(2)} (hole key second)', () => ({ ...SPARSE_X, any: holes(2) })],
+  ['{any: new Array(2), x} (hole key first)', () => ({ any: holes(2), ...SPARSE_X })],
 ];
-check('F-RM-D01', 'sparse predicate arrays ({all: [ , x]}, {any: new Array(2)}, also inside an if cond) are LogicError INVALID_EXPRESSION from check and evaluate, never a raw TypeError (E-0033; E-0014; AUDIT_R01 D01)', () => {
+check('F-RM-D01', 'sparse predicate arrays ({all: [ , x]}, {any: new Array(2)}, also inside an if cond, nested 8 and 900 deep under not/all, and in the non-first key of a multi-key mapping; audit R02 T01/T02) are LogicError INVALID_EXPRESSION from check and evaluate, never a raw TypeError (E-0033; E-0014; AUDIT_R01 D01)', () => {
   const F = mod('formula');
   const options = baseOptions();
   for (const [name, make] of SPARSE_SHAPES) {
